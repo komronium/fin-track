@@ -1,0 +1,1381 @@
+<html lang="en" class="h-full" style="font-size: 14px;"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinTrack Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    body {
+      box-sizing: border-box;
+      font-family: 'Onest', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .stat-card {
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .btn {
+      transition: all 0.2s;
+      font-weight: 500;
+      border-radius: 6px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: #7367f0;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5f54d6;
+    }
+
+    .btn-danger {
+      background: #ea5455;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #d63939;
+    }
+
+    .btn-secondary {
+      background: #82868b;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #6e7175;
+    }
+
+    .btn-success {
+      background: #28c76f;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #24b364;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d8d6de;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus {
+      outline: none;
+      border-color: #7367f0;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .table th {
+      background: #f8f7fa;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      color: #5e5873;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .table td {
+      padding: 12px;
+      border-bottom: 1px solid #ebe9f1;
+      font-size: 14px;
+    }
+
+    .table tr:hover {
+      background: #fafafa;
+    }
+
+    .badge {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      display: inline-block;
+    }
+
+    .badge-success {
+      background: #d4f4e2;
+      color: #28c76f;
+    }
+
+    .badge-danger {
+      background: #fce4e4;
+      color: #ea5455;
+    }
+
+    .badge-warning {
+      background: #fff3e0;
+      color: #ff9f43;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 90%;
+      overflow-y: auto;
+    }
+
+    .sidebar {
+      background: white;
+      border-right: 1px solid #ebe9f1;
+    }
+
+    .nav-item {
+      padding: 12px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-left: 3px solid transparent;
+      color: #6e6b7b;
+      font-weight: 500;
+    }
+
+    .nav-item:hover {
+      background: #f8f7fa;
+      color: #7367f0;
+    }
+
+    .nav-item.active {
+      background: #f8f7fa;
+      color: #7367f0;
+      border-left-color: #7367f0;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .dropdown-menu {
+      display: none;
+      position: fixed;
+      background: white;
+      border: 1px solid #ebe9f1;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      min-width: 140px;
+      z-index: 1000;
+    }
+
+    .dropdown-menu.active {
+      display: block;
+    }
+
+    .dropdown-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-size: 14px;
+      border-bottom: 1px solid #f8f7fa;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dropdown-item:last-child {
+      border-bottom: none;
+    }
+
+    .dropdown-item:hover {
+      background: #f8f7fa;
+    }
+
+    .dots-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 8px;
+      color: #6e6b7b;
+      font-size: 20px;
+      font-weight: bold;
+      transition: color 0.2s;
+      line-height: 1;
+    }
+
+    .dots-btn:hover {
+      color: #5e5873;
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+ <style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.table{display:table}.h-full{height:100%}</style></head>
+ <body class="h-full" style="background: rgb(248, 247, 250); margin: 0px; color: rgb(94, 88, 115); font-family: Onest, sans-serif;">
+  <div id="app" style="width: 100%; height: 100%; overflow: auto;">
+        <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 20px;">
+          <div class="card" style="max-width: 400px; width: 100%; padding: 40px;">
+            <h1 style="font-size: 2em; margin-bottom: 8px; color: #5e5873; font-weight: 700;">Sign In</h1>
+            <p style="color: #82868b; margin-bottom: 32px;">Enter your credentials to continue</p>
+
+            <form method="POST" action="{% url 'login' %}" id="loginForm" style="display: flex; flex-direction: column; gap: 20px;">
+                {% csrf_token %}
+              <div>
+                <label for="username" style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;">Username</label>
+                <input type="text" name="username" class="input-field" placeholder="Enter username" required="">
+              </div>
+
+              <div>
+                <label for="password" style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;">Password</label>
+                <input type="password" name="password" class="input-field" placeholder="Enter password" required="">
+              </div>
+
+              <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 1em; margin-top: 8px;">
+                Sign In
+              </button>
+              {% if form.errors %}
+              <p id="loginError" style="color: rgb(234, 84, 85); margin-top: 12px; text-align: center; font-size: 0.9em;">❌ Invalid username or password</p>
+            {% endif %}
+            </form>
+          </div>
+        </div>
+      </div>
+  <script>
+    const defaultConfig = {
+      primary_color: '#7367f0',
+      secondary_color: '#82868b',
+      success_color: '#28c76f',
+      danger_color: '#ea5455',
+      background_color: '#f8f7fa',
+      text_color: '#5e5873',
+      font_family: 'Onest',
+      font_size: 14,
+      app_title: 'FinTrack Dashboard',
+      welcome_message: 'Welcome back',
+      login_title: 'Sign In'
+    };
+
+    let currentUser = null;
+    let currentView = 'dashboard';
+    let allTransactions = [];
+    let allUsers = [];
+    let editingItem = null;
+    let searchQuery = '';
+    let filterType = 'all';
+
+    // Set default filter to last 5 days
+    const today = new Date();
+    const fiveDaysAgo = new Date(today);
+    fiveDaysAgo.setDate(today.getDate() - 5);
+    let filterDateFrom = fiveDaysAgo.toISOString().split('T')[0];
+    let filterDateTo = today.toISOString().split('T')[0];
+
+    const dataHandler = {
+      onDataChanged(data) {
+        allTransactions = data.filter(item => item.__type === 'transaction');
+        allUsers = data.filter(item => item.__type === 'user');
+        renderCurrentView();
+      }
+    };
+
+    async function initApp() {
+      const initResult = await window.dataSdk.init(dataHandler);
+      if (!initResult.isOk) {
+        console.error('Failed to initialize data SDK');
+        return;
+      }
+
+      await window.elementSdk.init({
+        defaultConfig,
+        onConfigChange: async (config) => {
+          document.body.style.background = config.background_color || defaultConfig.background_color;
+          document.body.style.color = config.text_color || defaultConfig.text_color;
+          document.body.style.fontFamily = `${config.font_family || defaultConfig.font_family}, sans-serif`;
+
+          const baseSize = config.font_size || defaultConfig.font_size;
+          document.documentElement.style.fontSize = `${baseSize}px`;
+
+          document.querySelectorAll('.btn-primary').forEach(btn => {
+            btn.style.background = config.primary_color || defaultConfig.primary_color;
+          });
+
+          document.querySelectorAll('.nav-item.active').forEach(item => {
+            item.style.color = config.primary_color || defaultConfig.primary_color;
+            item.style.borderLeftColor = config.primary_color || defaultConfig.primary_color;
+          });
+
+          renderCurrentView();
+        },
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            {
+              get: () => config.background_color || defaultConfig.background_color,
+              set: (value) => {
+                config.background_color = value;
+                window.elementSdk.setConfig({ background_color: value });
+              }
+            },
+            {
+              get: () => config.primary_color || defaultConfig.primary_color,
+              set: (value) => {
+                config.primary_color = value;
+                window.elementSdk.setConfig({ primary_color: value });
+              }
+            },
+            {
+              get: () => config.text_color || defaultConfig.text_color,
+              set: (value) => {
+                config.text_color = value;
+                window.elementSdk.setConfig({ text_color: value });
+              }
+            },
+            {
+              get: () => config.success_color || defaultConfig.success_color,
+              set: (value) => {
+                config.success_color = value;
+                window.elementSdk.setConfig({ success_color: value });
+              }
+            },
+            {
+              get: () => config.danger_color || defaultConfig.danger_color,
+              set: (value) => {
+                config.danger_color = value;
+                window.elementSdk.setConfig({ danger_color: value });
+              }
+            }
+          ],
+          borderables: [],
+          fontEditable: {
+            get: () => config.font_family || defaultConfig.font_family,
+            set: (value) => {
+              config.font_family = value;
+              window.elementSdk.setConfig({ font_family: value });
+            }
+          },
+          fontSizeable: {
+            get: () => config.font_size || defaultConfig.font_size,
+            set: (value) => {
+              config.font_size = value;
+              window.elementSdk.setConfig({ font_size: value });
+            }
+          }
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ['app_title', config.app_title || defaultConfig.app_title],
+          ['welcome_message', config.welcome_message || defaultConfig.welcome_message],
+          ['login_title', config.login_title || defaultConfig.login_title]
+        ])
+      });
+
+      renderLoginPage();
+    }
+
+    function renderLoginPage() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+
+
+    }
+
+    function renderDashboard() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+
+      // Apply filters
+      let filteredTransactions = allTransactions.filter(t => {
+        const matchesSearch = searchQuery === '' ||
+          t.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+        const matchesType = filterType === 'all' || t.type === filterType;
+
+        const transactionDate = new Date(t.date);
+        const matchesDateFrom = filterDateFrom === '' || transactionDate >= new Date(filterDateFrom);
+        const matchesDateTo = filterDateTo === '' || transactionDate <= new Date(filterDateTo);
+
+        return matchesSearch && matchesType && matchesDateFrom && matchesDateTo;
+      });
+
+      const income = filteredTransactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
+
+      const expenses = filteredTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
+
+      const balance = income - expenses;
+
+      app.innerHTML = `
+        <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
+          ${renderTopbar()}
+
+          <div style="flex: 1; padding: 24px; overflow-y: auto;">
+            <div style="max-width: 1400px; margin: 0 auto;">
+              <div style="margin-bottom: 24px;">
+                <h1 style="font-size: 2em; margin: 0; color: ${config.text_color || defaultConfig.text_color}; font-weight: 700;">${config.app_title || defaultConfig.app_title}</h1>
+                <p style="color: ${config.secondary_color || defaultConfig.secondary_color}; margin-top: 4px;">${config.welcome_message || defaultConfig.welcome_message}, ${currentUser.name}</p>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 32px;">
+                <div class="card stat-card" style="padding: 24px; background: #f0fdf4; border: 1px solid #bbf7d0;">
+                  <div style="font-size: 0.85em; margin-bottom: 8px; font-weight: 500; color: #15803d;">Total Income</div>
+                  <div style="font-size: 2em; font-weight: 700; color: #16a34a;">${income.toLocaleString()} sum</div>
+                </div>
+
+                <div class="card stat-card" style="padding: 24px; background: #fef2f2; border: 1px solid #fecaca;">
+                  <div style="font-size: 0.85em; margin-bottom: 8px; font-weight: 500; color: #991b1b;">Total Expenses</div>
+                  <div style="font-size: 2em; font-weight: 700; color: #dc2626;">${expenses.toLocaleString()} sum</div>
+                </div>
+
+                <div class="card stat-card" style="padding: 24px; background: #f5f3ff; border: 1px solid #ddd6fe;">
+                  <div style="font-size: 0.85em; margin-bottom: 8px; font-weight: 500; color: #6d28d9;">Balance</div>
+                  <div style="font-size: 2em; font-weight: 700; color: #7c3aed;">${balance.toLocaleString()} sum</div>
+                </div>
+              </div>
+
+              <div class="card" style="padding: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
+                  <h2 style="font-size: 1.3em; margin: 0; font-weight: 600; color: ${config.text_color || defaultConfig.text_color};">All Transactions</h2>
+                  <div style="display: flex; gap: 12px;">
+                    <button onclick="exportToPDF()" class="btn btn-secondary" style="display: flex; align-items: center; gap: 8px;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                      </svg>
+                      Export PDF
+                    </button>
+                    <button onclick="openTransactionModal()" class="btn btn-primary">+ Add Transaction</button>
+                  </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                  <div>
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color}; font-size: 0.9em;">Search</label>
+                    <input type="text" id="searchInput" class="input-field" placeholder="Search..." value="${searchQuery}" oninput="handleSearch(this.value)">
+                  </div>
+
+                  <div>
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color}; font-size: 0.9em;">Type</label>
+                    <select id="typeFilter" class="input-field" onchange="handleTypeFilter(this.value)">
+                      <option value="all" ${filterType === 'all' ? 'selected' : ''}>All Types</option>
+                      <option value="income" ${filterType === 'income' ? 'selected' : ''}>Income</option>
+                      <option value="expense" ${filterType === 'expense' ? 'selected' : ''}>Expense</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color}; font-size: 0.9em;">From Date</label>
+                    <input type="date" id="dateFromFilter" class="input-field" value="${filterDateFrom}" onchange="handleDateFromFilter(this.value)">
+                  </div>
+
+                  <div>
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color}; font-size: 0.9em;">To Date</label>
+                    <input type="date" id="dateToFilter" class="input-field" value="${filterDateTo}" onchange="handleDateToFilter(this.value)">
+                  </div>
+                </div>
+
+                ${filterType !== 'all' || searchQuery !== '' || filterDateFrom !== '' || filterDateTo !== '' ? `
+                  <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 0.9em; color: ${config.secondary_color || defaultConfig.secondary_color};">
+                      Showing ${filteredTransactions.length} of ${allTransactions.length} transactions
+                    </span>
+                    <button onclick="clearFilters()" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85em;">Clear Filters</button>
+                  </div>
+                ` : ''}
+
+                ${filteredTransactions.length === 0 ? `
+                  <p style="text-align: center; color: ${config.secondary_color || defaultConfig.secondary_color}; padding: 40px;">
+                    ${allTransactions.length === 0 ? 'No transactions yet. Add your first transaction!' : 'No transactions match your filters.'}
+                  </p>
+                ` : `
+                  <div style="overflow-x: auto;">
+                    <table class="table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Description</th>
+                          <th>Type</th>
+                          <th>Payment</th>
+                          <th>Amount</th>
+                          <th style="text-align: right;">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${filteredTransactions.map((t, idx) => `
+                          <tr>
+                            <td>${new Date(t.date).toLocaleDateString()}</td>
+                            <td style="font-weight: 500;">${t.description}</td>
+                            <td>
+                              <span class="badge ${t.type === 'income' ? 'badge-success' : 'badge-danger'}">
+                                ${t.type === 'income' ? 'Income' : 'Expense'}
+                              </span>
+                            </td>
+                            <td>
+                              <span class="badge badge-warning">
+                                ${t.payment_method === 'cash' ? 'Cash' : 'Card'}
+                              </span>
+                            </td>
+                            <td style="font-weight: 600; color: ${t.type === 'income' ? (config.success_color || defaultConfig.success_color) : (config.danger_color || defaultConfig.danger_color)};">
+                              ${t.type === 'income' ? '+' : '-'}${parseInt(t.amount).toLocaleString()} sum
+                            </td>
+                            <td style="text-align: right;">
+                              <div class="dropdown">
+                                <button class="dots-btn" onclick="toggleDropdown(event, 'trans-${idx}')">⋮</button>
+                                <div id="trans-${idx}" class="dropdown-menu">
+                                  <div class="dropdown-item" onclick='editTransaction(${JSON.stringify(t).replace(/'/g, "&apos;")})'>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                    Edit
+                                  </div>
+                                  <div class="dropdown-item" onclick='deleteTransaction(${JSON.stringify(t).replace(/'/g, "&apos;")})' style="color: #ea5455;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                      <polyline points="3 6 5 6 21 6"></polyline>
+                                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                    Delete
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                `}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderUsers() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+
+      app.innerHTML = `
+        <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
+          ${renderTopbar()}
+
+          <div style="flex: 1; padding: 24px; overflow-y: auto;">
+            <div style="max-width: 1400px; margin: 0 auto;">
+              <div style="margin-bottom: 24px;">
+                <h1 style="font-size: 2em; margin: 0; color: ${config.text_color || defaultConfig.text_color}; font-weight: 700;">Users</h1>
+                <p style="color: ${config.secondary_color || defaultConfig.secondary_color}; margin-top: 4px;">Manage system users and permissions</p>
+              </div>
+
+              <div class="card" style="padding: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                  <h2 style="font-size: 1.3em; margin: 0; font-weight: 600; color: ${config.text_color || defaultConfig.text_color};">All Users</h2>
+                  <button onclick="openUserModal()" class="btn btn-primary">+ Add User</button>
+                </div>
+
+                ${allUsers.length === 0 ? `
+                  <p style="text-align: center; color: ${config.secondary_color || defaultConfig.secondary_color}; padding: 40px;">No users found. Add your first user!</p>
+                ` : `
+                  <div style="overflow-x: auto;">
+                    <table class="table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Username</th>
+                          <th>Role</th>
+                          <th>Status</th>
+                          <th style="text-align: right;">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${allUsers.map((u, idx) => `
+                          <tr>
+                            <td style="font-weight: 500;">${u.name}</td>
+                            <td>${u.username}</td>
+                            <td>
+                              <span class="badge badge-warning">${u.role}</span>
+                            </td>
+                            <td>
+                              <span class="badge ${u.status === 'active' ? 'badge-success' : 'badge-danger'}">
+                                ${u.status}
+                              </span>
+                            </td>
+                            <td style="text-align: right;">
+                              <div class="dropdown">
+                                <button class="dots-btn" onclick="toggleDropdown(event, 'user-${idx}')">⋮</button>
+                                <div id="user-${idx}" class="dropdown-menu">
+                                  <div class="dropdown-item" onclick='editUser(${JSON.stringify(u).replace(/'/g, "&apos;")})'>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                    Edit
+                                  </div>
+                                  <div class="dropdown-item" onclick='deleteUser(${JSON.stringify(u).replace(/'/g, "&apos;")})' style="color: #ea5455;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                      <polyline points="3 6 5 6 21 6"></polyline>
+                                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                    Delete
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                `}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTopbar() {
+      const config = window.elementSdk?.config || defaultConfig;
+      return `
+        <div style="width: 100%; padding: 16px 32px; border-bottom: 1px solid #ebe9f1; display: flex; justify-content: space-between; align-items: center; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+          <div style="display: flex; align-items: center; gap: 48px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="width: 32px; height: 32px; background: linear-gradient(135deg, ${config.primary_color || defaultConfig.primary_color}, #5f54d6); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 1.2em;">F</div>
+              <h2 style="margin: 0; font-size: 1.3em; font-weight: 700; color: ${config.text_color || defaultConfig.text_color};">FinTrack</h2>
+            </div>
+
+            <nav style="display: flex; gap: 4px;">
+              <div class="nav-item ${currentView === 'dashboard' ? 'active' : ''}" onclick="navigateTo('dashboard')" style="padding: 10px 20px; border-left: none; border-radius: 8px; background: ${currentView === 'dashboard' ? (config.primary_color || defaultConfig.primary_color) : 'transparent'}; color: ${currentView === 'dashboard' ? 'white' : (config.text_color || defaultConfig.text_color)};">
+                <span style="font-size: 0.95em; display: flex; align-items: center; gap: 8px;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                  </svg>
+                  Dashboard
+                </span>
+              </div>
+              <div class="nav-item ${currentView === 'users' ? 'active' : ''}" onclick="navigateTo('users')" style="padding: 10px 20px; border-left: none; border-radius: 8px; background: ${currentView === 'users' ? (config.primary_color || defaultConfig.primary_color) : 'transparent'}; color: ${currentView === 'users' ? 'white' : (config.text_color || defaultConfig.text_color)};">
+                <span style="font-size: 0.95em; display: flex; align-items: center; gap: 8px;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                  </svg>
+                  Users
+                </span>
+              </div>
+            </nav>
+          </div>
+
+          <button onclick="logout()" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Logout
+          </button>
+        </div>
+      `;
+    }
+
+    function navigateTo(view) {
+      currentView = view;
+      renderCurrentView();
+    }
+
+    function renderCurrentView() {
+      if (!currentUser) {
+        renderLoginPage();
+        return;
+      }
+
+      switch(currentView) {
+        case 'dashboard':
+          renderDashboard();
+          break;
+        case 'users':
+          renderUsers();
+          break;
+      }
+    }
+
+    function logout() {
+      currentUser = null;
+      currentView = 'dashboard';
+      renderLoginPage();
+    }
+
+    function openTransactionModal(transaction = null) {
+      editingItem = transaction;
+      const config = window.elementSdk?.config || defaultConfig;
+
+      const modal = document.createElement('div');
+      modal.className = 'modal active';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h2 style="margin: 0 0 24px 0; font-size: 1.5em; font-weight: 600; color: ${config.text_color || defaultConfig.text_color};">
+            ${transaction ? 'Edit Transaction' : 'Add Transaction'}
+          </h2>
+
+          <form id="transactionForm" style="display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div>
+                <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color};">Amount</label>
+                <input type="number" name="amount" class="input-field" step="1" value="${transaction?.amount || ''}" required>
+              </div>
+
+              <div>
+                <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color};">Date</label>
+                <input type="date" name="date" class="input-field" value="${transaction?.date || new Date().toISOString().split('T')[0]}" required>
+              </div>
+            </div>
+
+            <div>
+              <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color};">Description (optional)</label>
+              <input type="text" name="description" class="input-field" value="${transaction?.description || ''}" placeholder="Enter description (optional)">
+            </div>
+
+            <div>
+              <label style="display: block; margin-bottom: 10px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color};">Type</label>
+              <div style="display: flex; gap: 12px;">
+                <button type="button" class="type-btn ${!transaction || transaction?.type === 'income' ? 'active' : ''}" data-type="income" style="flex: 1; padding: 16px; border: 2px solid #16a34a; background: ${!transaction || transaction?.type === 'income' ? 'linear-gradient(135deg, #16a34a, #15803d)' : 'white'}; color: ${!transaction || transaction?.type === 'income' ? 'white' : '#16a34a'}; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; box-shadow: ${!transaction || transaction?.type === 'income' ? '0 4px 12px rgba(22, 163, 74, 0.3)' : '0 2px 4px rgba(0,0,0,0.05)'}; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <polyline points="19 12 12 19 5 12"></polyline>
+                  </svg>
+                  Income
+                </button>
+                <button type="button" class="type-btn ${transaction?.type === 'expense' ? 'active' : ''}" data-type="expense" style="flex: 1; padding: 16px; border: 2px solid #dc2626; background: ${transaction?.type === 'expense' ? 'linear-gradient(135deg, #dc2626, #991b1b)' : 'white'}; color: ${transaction?.type === 'expense' ? 'white' : '#dc2626'}; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; box-shadow: ${transaction?.type === 'expense' ? '0 4px 12px rgba(220, 38, 38, 0.3)' : '0 2px 4px rgba(0,0,0,0.05)'}; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="19" x2="12" y2="5"></line>
+                    <polyline points="5 12 12 5 19 12"></polyline>
+                  </svg>
+                  Expense
+                </button>
+              </div>
+              <input type="hidden" name="type" value="${transaction?.type || 'income'}">
+            </div>
+
+            <div>
+              <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color};">Payment Method</label>
+              <select name="payment_method" class="input-field" required>
+                <option value="cash" ${transaction?.payment_method === 'cash' ? 'selected' : ''}>Cash</option>
+                <option value="card" ${transaction?.payment_method === 'card' ? 'selected' : ''}>Card</option>
+              </select>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 8px;">
+              <button type="submit" class="btn btn-primary" style="flex: 1;">
+                <span class="btn-text">${transaction ? 'Update' : 'Add'}</span>
+              </button>
+              <button type="button" onclick="closeModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+            </div>
+          </form>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      document.querySelectorAll('.type-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const type = this.getAttribute('data-type');
+          document.querySelector('input[name="type"]').value = type;
+
+          document.querySelectorAll('.type-btn').forEach(b => {
+            b.classList.remove('active');
+            if (b.getAttribute('data-type') === 'income') {
+              b.style.background = 'white';
+              b.style.color = '#16a34a';
+              b.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+            } else {
+              b.style.background = 'white';
+              b.style.color = '#dc2626';
+              b.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+            }
+          });
+
+          this.classList.add('active');
+          if (type === 'income') {
+            this.style.background = 'linear-gradient(135deg, #16a34a, #15803d)';
+            this.style.color = 'white';
+            this.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)';
+          } else {
+            this.style.background = 'linear-gradient(135deg, #dc2626, #991b1b)';
+            this.style.color = 'white';
+            this.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+          }
+        });
+      });
+
+      document.getElementById('transactionForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const originalText = btnText.textContent;
+
+        btnText.innerHTML = '<span class="loading"></span>';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(e.target);
+        const data = {
+          __type: 'transaction',
+          id: transaction?.id || Date.now().toString(),
+          description: formData.get('description') || '-',
+          amount: formData.get('amount'),
+          type: formData.get('type'),
+          payment_method: formData.get('payment_method'),
+          date: formData.get('date'),
+          createdAt: transaction?.createdAt || new Date().toISOString()
+        };
+
+        let result;
+        if (transaction) {
+          result = await window.dataSdk.update({ ...data, __backendId: transaction.__backendId });
+        } else {
+          if (allTransactions.length + allUsers.length >= 999) {
+            btnText.textContent = originalText;
+            submitBtn.disabled = false;
+            const errorMsg = document.createElement('p');
+            errorMsg.style.color = config.danger_color || defaultConfig.danger_color;
+            errorMsg.style.marginTop = '12px';
+            errorMsg.textContent = 'Maximum limit of 999 items reached. Please delete some items first.';
+            e.target.appendChild(errorMsg);
+            return;
+          }
+          result = await window.dataSdk.create(data);
+        }
+
+        if (result.isOk) {
+          closeModal();
+        } else {
+          btnText.textContent = originalText;
+          submitBtn.disabled = false;
+          const errorMsg = document.createElement('p');
+          errorMsg.style.color = config.danger_color || defaultConfig.danger_color;
+          errorMsg.style.marginTop = '12px';
+          errorMsg.textContent = 'Failed to save transaction. Please try again.';
+          e.target.appendChild(errorMsg);
+        }
+      });
+    }
+
+    function openUserModal(user = null) {
+      editingItem = user;
+      const config = window.elementSdk?.config || defaultConfig;
+
+      const modal = document.createElement('div');
+      modal.className = 'modal active';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h2 style="margin: 0 0 24px 0; font-size: 1.5em; font-weight: 600; color: ${config.text_color || defaultConfig.text_color};">
+            ${user ? 'Edit User' : 'Add User'}
+          </h2>
+
+          <form id="userForm" style="display: flex; flex-direction: column; gap: 16px;">
+            <div>
+              <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color};">Name</label>
+              <input type="text" name="name" class="input-field" value="${user?.name || ''}" required>
+            </div>
+
+            <div>
+              <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color};">Username</label>
+              <input type="text" name="username" class="input-field" value="${user?.username || ''}" required>
+            </div>
+
+            <div>
+              <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color};">Role</label>
+              <select name="role" class="input-field" required>
+                <option value="admin" ${user?.role === 'admin' ? 'selected' : ''}>Admin</option>
+                <option value="user" ${user?.role === 'user' ? 'selected' : ''}>User</option>
+                <option value="manager" ${user?.role === 'manager' ? 'selected' : ''}>Manager</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color};">Status</label>
+              <select name="status" class="input-field" required>
+                <option value="active" ${user?.status === 'active' ? 'selected' : ''}>Active</option>
+                <option value="inactive" ${user?.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="display: block; margin-bottom: 6px; font-weight: 500; color: ${config.text_color || defaultConfig.text_color};">Password ${user ? '(leave blank to keep current)' : ''}</label>
+              <input type="password" name="password" class="input-field" placeholder="${user ? 'Enter new password' : 'Enter password'}" ${user ? '' : 'required'}>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 8px;">
+              <button type="submit" class="btn btn-primary" style="flex: 1;">
+                <span class="btn-text">${user ? 'Update' : 'Add'}</span>
+              </button>
+              <button type="button" onclick="closeModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+            </div>
+          </form>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      document.getElementById('userForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const originalText = btnText.textContent;
+
+        btnText.innerHTML = '<span class="loading"></span>';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(e.target);
+        const password = formData.get('password');
+        const data = {
+          __type: 'user',
+          id: user?.id || Date.now().toString(),
+          name: formData.get('name'),
+          username: formData.get('username'),
+          role: formData.get('role'),
+          status: formData.get('status'),
+          password: password || user?.password || '',
+          createdAt: user?.createdAt || new Date().toISOString()
+        };
+
+        let result;
+        if (user) {
+          result = await window.dataSdk.update({ ...data, __backendId: user.__backendId });
+        } else {
+          if (allTransactions.length + allUsers.length >= 999) {
+            btnText.textContent = originalText;
+            submitBtn.disabled = false;
+            const errorMsg = document.createElement('p');
+            errorMsg.style.color = config.danger_color || defaultConfig.danger_color;
+            errorMsg.style.marginTop = '12px';
+            errorMsg.textContent = 'Maximum limit of 999 items reached. Please delete some items first.';
+            e.target.appendChild(errorMsg);
+            return;
+          }
+          result = await window.dataSdk.create(data);
+        }
+
+        if (result.isOk) {
+          closeModal();
+        } else {
+          btnText.textContent = originalText;
+          submitBtn.disabled = false;
+          const errorMsg = document.createElement('p');
+          errorMsg.style.color = config.danger_color || defaultConfig.danger_color;
+          errorMsg.style.marginTop = '12px';
+          errorMsg.textContent = 'Failed to save user. Please try again.';
+          e.target.appendChild(errorMsg);
+        }
+      });
+    }
+
+    function editTransaction(transaction) {
+      openTransactionModal(transaction);
+    }
+
+    function editUser(user) {
+      openUserModal(user);
+    }
+
+    async function deleteTransaction(transaction) {
+      const confirmDelete = document.createElement('div');
+      confirmDelete.className = 'modal active';
+      const config = window.elementSdk?.config || defaultConfig;
+
+      confirmDelete.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+          <h2 style="margin: 0 0 16px 0; font-size: 1.3em; font-weight: 600; color: ${config.text_color || defaultConfig.text_color};">Confirm Delete</h2>
+          <p style="margin-bottom: 24px; color: ${config.secondary_color || defaultConfig.secondary_color};">Are you sure you want to delete this transaction?</p>
+          <div style="display: flex; gap: 12px;">
+            <button onclick="confirmDeleteTransaction(${JSON.stringify(transaction).replace(/'/g, "&apos;")})" class="btn btn-danger" style="flex: 1;">
+              <span class="btn-text">Delete</span>
+            </button>
+            <button onclick="closeModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(confirmDelete);
+    }
+
+    async function deleteUser(user) {
+      const confirmDelete = document.createElement('div');
+      confirmDelete.className = 'modal active';
+      const config = window.elementSdk?.config || defaultConfig;
+
+      confirmDelete.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+          <h2 style="margin: 0 0 16px 0; font-size: 1.3em; font-weight: 600; color: ${config.text_color || defaultConfig.text_color};">Confirm Delete</h2>
+          <p style="margin-bottom: 24px; color: ${config.secondary_color || defaultConfig.secondary_color};">Are you sure you want to delete this user?</p>
+          <div style="display: flex; gap: 12px;">
+            <button onclick="confirmDeleteUser(${JSON.stringify(user).replace(/'/g, "&apos;")})" class="btn btn-danger" style="flex: 1;">
+              <span class="btn-text">Delete</span>
+            </button>
+            <button onclick="closeModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(confirmDelete);
+    }
+
+    async function confirmDeleteTransaction(transaction) {
+      const modal = document.querySelector('.modal');
+      const deleteBtn = modal.querySelector('.btn-danger');
+      const btnText = deleteBtn.querySelector('.btn-text');
+
+      btnText.innerHTML = '<span class="loading"></span>';
+      deleteBtn.disabled = true;
+
+      const result = await window.dataSdk.delete(transaction);
+
+      if (result.isOk) {
+        closeModal();
+      } else {
+        btnText.textContent = 'Delete';
+        deleteBtn.disabled = false;
+        const errorMsg = document.createElement('p');
+        const config = window.elementSdk?.config || defaultConfig;
+        errorMsg.style.color = config.danger_color || defaultConfig.danger_color;
+        errorMsg.style.marginTop = '12px';
+        errorMsg.textContent = 'Failed to delete transaction. Please try again.';
+        modal.querySelector('.modal-content').appendChild(errorMsg);
+      }
+    }
+
+    async function confirmDeleteUser(user) {
+      const modal = document.querySelector('.modal');
+      const deleteBtn = modal.querySelector('.btn-danger');
+      const btnText = deleteBtn.querySelector('.btn-text');
+
+      btnText.innerHTML = '<span class="loading"></span>';
+      deleteBtn.disabled = true;
+
+      const result = await window.dataSdk.delete(user);
+
+      if (result.isOk) {
+        closeModal();
+      } else {
+        btnText.textContent = 'Delete';
+        deleteBtn.disabled = false;
+        const errorMsg = document.createElement('p');
+        const config = window.elementSdk?.config || defaultConfig;
+        errorMsg.style.color = config.danger_color || defaultConfig.danger_color;
+        errorMsg.style.marginTop = '12px';
+        errorMsg.textContent = 'Failed to delete user. Please try again.';
+        modal.querySelector('.modal-content').appendChild(errorMsg);
+      }
+    }
+
+    function closeModal() {
+      const modals = document.querySelectorAll('.modal');
+      modals.forEach(modal => modal.remove());
+      editingItem = null;
+    }
+
+    window.navigateTo = navigateTo;
+    window.logout = logout;
+    window.openTransactionModal = openTransactionModal;
+    window.openUserModal = openUserModal;
+    window.editTransaction = editTransaction;
+    window.editUser = editUser;
+    window.deleteTransaction = deleteTransaction;
+    window.deleteUser = deleteUser;
+    window.confirmDeleteTransaction = confirmDeleteTransaction;
+    window.confirmDeleteUser = confirmDeleteUser;
+    window.closeModal = closeModal;
+
+    function toggleDropdown(event, id) {
+      event.stopPropagation();
+
+      const allDropdowns = document.querySelectorAll('.dropdown-menu');
+      allDropdowns.forEach(dropdown => {
+        if (dropdown.id !== id) {
+          dropdown.classList.remove('active');
+        }
+      });
+
+      const dropdown = document.getElementById(id);
+      const button = event.currentTarget;
+      const rect = button.getBoundingClientRect();
+
+      dropdown.style.top = `${rect.bottom + 4}px`;
+      dropdown.style.left = `${rect.right - 140}px`;
+
+      dropdown.classList.toggle('active');
+    }
+
+    document.addEventListener('click', () => {
+      const allDropdowns = document.querySelectorAll('.dropdown-menu');
+      allDropdowns.forEach(dropdown => dropdown.classList.remove('active'));
+    });
+
+    window.toggleDropdown = toggleDropdown;
+
+    function handleSearch(value) {
+      searchQuery = value;
+      renderDashboard();
+    }
+
+    function handleTypeFilter(value) {
+      filterType = value;
+      renderDashboard();
+    }
+
+    function handleDateFromFilter(value) {
+      filterDateFrom = value;
+      renderDashboard();
+    }
+
+    function handleDateToFilter(value) {
+      filterDateTo = value;
+      renderDashboard();
+    }
+
+    function clearFilters() {
+      searchQuery = '';
+      filterType = 'all';
+      const today = new Date();
+      const fiveDaysAgo = new Date(today);
+      fiveDaysAgo.setDate(today.getDate() - 5);
+      filterDateFrom = fiveDaysAgo.toISOString().split('T')[0];
+      filterDateTo = today.toISOString().split('T')[0];
+      renderDashboard();
+    }
+
+    window.handleSearch = handleSearch;
+    window.handleTypeFilter = handleTypeFilter;
+    window.handleDateFromFilter = handleDateFromFilter;
+    window.handleDateToFilter = handleDateToFilter;
+    window.clearFilters = clearFilters;
+
+    function exportToPDF() {
+      const config = window.elementSdk?.config || defaultConfig;
+
+      let filteredTransactions = allTransactions.filter(t => {
+        const matchesSearch = searchQuery === '' ||
+          t.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+        const matchesType = filterType === 'all' || t.type === filterType;
+
+        const transactionDate = new Date(t.date);
+        const matchesDateFrom = filterDateFrom === '' || transactionDate >= new Date(filterDateFrom);
+        const matchesDateTo = filterDateTo === '' || transactionDate <= new Date(filterDateTo);
+
+        return matchesSearch && matchesType && matchesDateFrom && matchesDateTo;
+      });
+
+      const income = filteredTransactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
+
+      const expenses = filteredTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + parseInt(t.amount || 0), 0);
+
+      const balance = income - expenses;
+
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Transactions Report</title>
+          <style>
+            body {
+              font-family: 'Onest', Arial, sans-serif;
+              padding: 40px;
+              color: #333;
+            }
+            h1 {
+              color: #7367f0;
+              margin-bottom: 10px;
+            }
+            .date {
+              color: #666;
+              margin-bottom: 30px;
+            }
+            .summary {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 20px;
+              margin-bottom: 40px;
+            }
+            .summary-card {
+              padding: 20px;
+              border: 2px solid #e0e0e0;
+              border-radius: 8px;
+            }
+            .summary-card h3 {
+              margin: 0 0 10px 0;
+              font-size: 14px;
+              color: #666;
+            }
+            .summary-card .amount {
+              font-size: 24px;
+              font-weight: bold;
+            }
+            .income { color: #16a34a; }
+            .expense { color: #dc2626; }
+            .balance { color: #7c3aed; }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th {
+              background: #f5f5f5;
+              padding: 12px;
+              text-align: left;
+              border-bottom: 2px solid #ddd;
+              font-weight: 600;
+            }
+            td {
+              padding: 12px;
+              border-bottom: 1px solid #eee;
+            }
+            .badge {
+              padding: 4px 8px;
+              border-radius: 4px;
+              font-size: 12px;
+              font-weight: 500;
+            }
+            .badge-income {
+              background: #d4f4e2;
+              color: #16a34a;
+            }
+            .badge-expense {
+              background: #fce4e4;
+              color: #dc2626;
+            }
+            .badge-payment {
+              background: #fff3e0;
+              color: #ff9f43;
+            }
+            @media print {
+              body { padding: 20px; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Transactions Report</h1>
+          <div class="date">Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</div>
+
+          <div class="summary">
+            <div class="summary-card">
+              <h3>Total Income</h3>
+              <div class="amount income">${income.toLocaleString()} sum</div>
+            </div>
+            <div class="summary-card">
+              <h3>Total Expenses</h3>
+              <div class="amount expense">${expenses.toLocaleString()} sum</div>
+            </div>
+            <div class="summary-card">
+              <h3>Balance</h3>
+              <div class="amount balance">${balance.toLocaleString()} sum</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Type</th>
+                <th>Payment</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredTransactions.map(t => `
+                <tr>
+                  <td>${new Date(t.date).toLocaleDateString()}</td>
+                  <td>${t.description}</td>
+                  <td>
+                    <span class="badge badge-${t.type === 'income' ? 'income' : 'expense'}">
+                      ${t.type === 'income' ? 'Income' : 'Expense'}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge badge-payment">
+                      ${t.payment_method === 'cash' ? 'Cash' : 'Card'}
+                    </span>
+                  </td>
+                  <td style="font-weight: 600;" class="${t.type === 'income' ? 'income' : 'expense'}">
+                    ${t.type === 'income' ? '+' : '-'}${parseInt(t.amount).toLocaleString()} sum
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
+
+    window.exportToPDF = exportToPDF;
+
+    initApp();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c70edd72073d24a',t:'MTc2OTk0MzQ1OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><iframe height="1" width="1" style="position: absolute; top: 0px; left: 0px; border: none; visibility: hidden;"></iframe>
+</body></html>
