@@ -416,6 +416,7 @@
         document.getElementById('userForm').reset();
         document.getElementById('isActive').value = 'true';
         document.getElementById('isStaff').value = 'false';
+        document.getElementById('username').readOnly = false;
       }
 
       userModal.classList.add('active');
@@ -442,6 +443,10 @@
           console.error('Error loading user:', error);
           alert('Error loading user data');
         });
+    }
+
+    function makeUsernameEditable() {
+      document.getElementById('username').readOnly = false;
     }
 
     document.getElementById('userForm').addEventListener('submit', function(e) {
