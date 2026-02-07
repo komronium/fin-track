@@ -1,0 +1,1143 @@
+{% load number_format %}
+
+<html lang="en" class="h-full" style="font-size: 14px;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warehouse - FinTrack</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      box-sizing: border-box;
+      font-family: 'Onest', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .btn {
+      transition: all 0.2s;
+      font-weight: 500;
+      border-radius: 6px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: #7367f0;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5f54d6;
+    }
+
+    .btn-danger {
+      background: #ea5455;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #d63939;
+    }
+
+    .btn-secondary {
+      background: #82868b;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #6e7175;
+    }
+
+    .btn-success {
+      background: #28c76f;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #24b364;
+    }
+
+    .quick-btn {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border-radius: 6px;
+      font-size: 1.2em;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .quick-btn-in {
+      background: #d4f4e2;
+      color: #28c76f;
+    }
+
+    .quick-btn-in:hover {
+      background: #c0ead3;
+      transform: scale(1.05);
+    }
+
+    .quick-btn-out {
+      background: #fce4e4;
+      color: #ea5455;
+    }
+
+    .quick-btn-out:hover {
+      background: #f8d0d0;
+      transform: scale(1.05);
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d8d6de;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus {
+      outline: none;
+      border-color: #7367f0;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .table th {
+      background: #f8f7fa;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      color: #5e5873;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .table td {
+      padding: 12px;
+      border-bottom: 1px solid #ebe9f1;
+      font-size: 14px;
+    }
+
+    .table tr:hover {
+      background: #fafafa;
+    }
+
+    .badge {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      display: inline-block;
+    }
+
+    .badge-in {
+      background: #d4f4e2;
+      color: #28c76f;
+    }
+
+    .badge-out {
+      background: #fce4e4;
+      color: #ea5455;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #ebe9f1;
+    }
+
+    .tab-btn {
+      padding: 12px 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      color: #82868b;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      font-size: 0.95em;
+    }
+
+    .tab-btn.active {
+      color: #7367f0;
+      border-bottom-color: #7367f0;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 90%;
+      overflow-y: auto;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #5e5873;
+      font-size: 0.9em;
+    }
+
+    .item-row {
+      background: white;
+      border: 1px solid #ebe9f1;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s;
+    }
+
+    .item-row:hover {
+      border-color: #7367f0;
+      box-shadow: 0 2px 8px rgba(115, 103, 240, 0.1);
+    }
+
+    .item-info {
+      flex: 1;
+    }
+
+    .item-name {
+      font-size: 1.05em;
+      font-weight: 600;
+      color: #5e5873;
+      margin: 0;
+    }
+
+    .item-desc {
+      font-size: 0.85em;
+      color: #82868b;
+      margin: 4px 0 0 0;
+    }
+
+    .item-qty {
+      font-size: 1.8em;
+      font-weight: 700;
+      color: #7367f0;
+      text-align: center;
+      min-width: 60px;
+      margin: 0 20px;
+    }
+
+    .item-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .qty-input {
+      width: 60px;
+      padding: 6px 8px;
+      border: 1px solid #d8d6de;
+      border-radius: 6px;
+      text-align: center;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="h-full" style="background: rgb(248, 247, 250); margin: 0px; color: rgb(94, 88, 115); font-family: Onest, sans-serif;">
+  <div id="app" style="width: 100%; height: 100%; overflow: auto;">
+    <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
+
+      <div style="width: 100%; padding: 16px 32px; border-bottom: 1px solid #ebe9f1; display: flex; justify-content: space-between; align-items: center; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+        <div style="display: flex; align-items: center; gap: 32px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #7367f0, #5f54d6); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 1.2em;">F</div>
+            <h2 style="margin: 0; font-size: 1.3em; font-weight: 700; color: #5e5873;">FinTrack</h2>
+          </div>
+          <nav style="display: flex; gap: 8px;">
+            <a href="{% url 'dashboard' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+              Dashboard
+            </a>
+            {% if request.user.is_staff %}
+            <a href="{% url 'users' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              Users
+            </a>
+            <a href="{% url 'monthly' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              Employees
+            </a>
+            <a href="{% url 'warehouse' %}" class="btn" style="background: #7367f0; color: white; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+              Warehouse
+            </a>
+            {% endif %}
+          </nav>
+        </div>
+        <form method="POST" action="{% url 'logout' %}" style="margin: 0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Logout
+          </button>
+        </form>
+      </div>
+
+      <div style="flex: 1; padding: 24px; overflow-y: auto;">
+        <div style="max-width: 1400px; margin: 0 auto;">
+          <div style="margin-bottom: 24px;">
+            <h1 style="font-size: 2em; margin: 0; color: #5e5873; font-weight: 700;">Warehouse</h1>
+            <p style="color: #82868b; margin-top: 4px;">Manage inventory - quick in/out operations</p>
+          </div>
+
+          <div class="card" style="padding: 24px;">
+            <div class="tabs">
+              <button class="tab-btn active" onclick="switchWarehouseTab('items')">Items in Stock</button>
+              <button class="tab-btn" onclick="switchWarehouseTab('movements')">In/Out Movements</button>
+            </div>
+
+            <!-- Tab 1: Items in Stock -->
+            <div id="items" class="tab-content active">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
+                <h2 style="font-size: 1.3em; margin: 0; font-weight: 600; color: #5e5873;">All Items</h2>
+                <button onclick="openAddItemModal()" class="btn btn-primary">+ New Item</button>
+              </div>
+
+              <div style="overflow-x: auto;">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Description</th>
+                      <th>Quantity</th>
+                      <th style="width: 50px;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="itemsContainer">
+                    <tr style="text-align: center; color: #82868b;">
+                      <td colspan="4">Loading items...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Tab 2: Movements -->
+            <div id="movements" class="tab-content">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
+                <h2 style="font-size: 1.3em; margin: 0; font-weight: 600; color: #5e5873;">Movement History</h2>
+                <button onclick="openMovementModal()" class="btn btn-primary">+ Add Movement</button>
+              </div>
+
+              <!-- Filter Section -->
+              <div style="margin-bottom: 20px;">
+                <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;">
+                  <span style="font-weight: 500; color: #5e5873;">Filter:</span>
+                  <select id="filterByItem" class="input-field" style="width: 150px;" onchange="updateMovementsTables()">
+                    <option value="">All Items</option>
+                  </select>
+                  <input type="date" id="filterDateFrom" class="input-field" style="width: 150px;" placeholder="From" onchange="updateMovementsTables()">
+                  <input type="date" id="filterDateTo" class="input-field" style="width: 150px;" placeholder="To" onchange="updateMovementsTables()">
+                  <button onclick="clearFilters()" class="btn btn-secondary" style="padding: 8px 12px; font-size: 0.9em;">Clear</button>
+                </div>
+              </div>
+
+              <!-- Movement Sub-tabs -->
+              <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('all')">All</button>
+                <button class="tab-btn" onclick="switchTab('in')">Items In</button>
+                <button class="tab-btn" onclick="switchTab('out')">Items Out</button>
+              </div>
+
+              <div id="all" class="tab-content active">
+                <div style="overflow-x: auto;">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Type</th>
+                        <th>Qty</th>
+                        <th>Date</th>
+                        <th>Notes</th>
+                        <th style="width: 50px;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="movementsAllBody">
+                      <tr style="text-align: center; color: #82868b;">
+                        <td colspan="6">No movements yet</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div id="in" class="tab-content">
+                <div style="overflow-x: auto;">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Quantity</th>
+                        <th>Date</th>
+                        <th>Notes</th>
+                        <th style="width: 50px;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="movementsInBody">
+                      <tr style="text-align: center; color: #82868b;">
+                        <td colspan="5">No items received yet</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div id="out" class="tab-content">
+                <div style="overflow-x: auto;">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Quantity</th>
+                        <th>Date</th>
+                        <th>Notes</th>
+                        <th style="width: 50px;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="movementsOutBody">
+                      <tr style="text-align: center; color: #82868b;">
+                        <td colspan="5">No items shipped yet</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Item Modal -->
+  <div id="addItemModal" class="modal">
+    <div class="modal-content">
+      <h2 style="margin-top: 0; color: #5e5873;">Add New Item</h2>
+      <div class="form-group">
+        <label>Item Name *</label>
+        <input type="text" id="newItemName" class="input-field" placeholder="e.g., Laptop, Phone, Monitor">
+      </div>
+      <div class="form-group">
+        <label>Initial Quantity</label>
+        <input type="number" id="newItemQty" class="input-field" placeholder="0" min="0" step="1" value="0">
+      </div>
+      <div class="form-group">
+        <label>Description (Optional)</label>
+        <textarea id="newItemDesc" class="input-field" placeholder="Notes about this item" rows="2" style="resize: vertical;"></textarea>
+      </div>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button onclick="closeAddItemModal()" class="btn btn-secondary">Cancel</button>
+        <button onclick="saveNewItem()" class="btn btn-primary">Add Item</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unified Movement Modal -->
+  <div id="movementModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <h2 style="margin-top: 0; color: #5e5873;">Add Movement</h2>
+      <div class="form-group">
+        <label>Item *</label>
+        <select id="movementItem" class="input-field" style="padding: 10px;">
+          <option value="">-- Select an item --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Type *</label>
+        <div style="display: flex; gap: 16px; padding: 10px 0;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="radio" name="movementType" value="in" checked style="cursor: pointer;">
+            <span>Add In (Incoming)</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="radio" name="movementType" value="out" style="cursor: pointer;">
+            <span>Remove Out (Outgoing)</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Quantity *</label>
+        <input type="number" id="movementQty" class="input-field" placeholder="How many?" min="1" step="1">
+      </div>
+      <div class="form-group">
+        <label>Date *</label>
+        <input type="date" id="movementDate" class="input-field">
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" id="movementNotes" class="input-field" placeholder="Additional details">
+      </div>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button onclick="closeMovementModal()" class="btn btn-secondary">Cancel</button>
+        <button onclick="saveMovement()" class="btn btn-primary">Save Movement</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentItemId = null;
+    let currentEntryType = null;
+    let allMovements = [];
+
+    const today = new Date().toISOString().split('T')[0];
+
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('[LOAD] DOMContentLoaded event fired');
+      try {
+        const dateInput = document.getElementById('movementDate');
+        if (dateInput) {
+          dateInput.value = today;
+          console.log('[LOAD] Set movementDate to:', today);
+        } else {
+          console.warn('[LOAD] movementDate element not found');
+        }
+        
+        // Ensure initial tab states are correct
+        console.log('[LOAD] Initializing tab states...');
+        document.getElementById('items').classList.add('active');
+        document.getElementById('movements').classList.remove('active');
+        document.getElementById('all').classList.add('active');
+        document.getElementById('in').classList.remove('active');
+        document.getElementById('out').classList.remove('active');
+        console.log('[LOAD] Tab states initialized');
+      } catch(e) {
+        console.error('[LOAD] Error:', e);
+      }
+      
+      console.log('[LOAD] Starting data loads...');
+      loadItems();
+      loadMovements();
+    });
+
+    // Fallback: If DOMContentLoaded seems slow, also try loading after a brief delay
+    if (document.readyState === 'loading') {
+      console.log('[LOAD] Document is still loading, waiting for DOMContentLoaded');
+    } else {
+      console.log('[LOAD] Document already loaded, loading data immediately');
+      setTimeout(function() {
+        loadItems();
+        loadMovements();
+      }, 500);
+    }
+
+    function switchTab(tab) {
+      console.log('[SUB-TAB] Switching to:', tab);
+      // Hide all movement sub-tabs
+      document.getElementById('all').classList.remove('active');
+      document.getElementById('in').classList.remove('active');
+      document.getElementById('out').classList.remove('active');
+      // Show the selected tab
+      document.getElementById(tab).classList.add('active');
+      
+      // Update button states for movement sub-tabs
+      const movementTabs = document.querySelectorAll('.tabs:not(:first-child) .tab-btn');
+      movementTabs.forEach(el => {
+        el.classList.remove('active');
+      });
+      event.target.classList.add('active');
+      console.log('[SUB-TAB] Switched to:', tab);
+    }
+
+    function switchWarehouseTab(tab) {
+      console.log('[TAB] Switching to:', tab);
+      // Only toggle the main warehouse tabs (items and movements)
+      document.getElementById('items').classList.remove('active');
+      document.getElementById('movements').classList.remove('active');
+      document.getElementById(tab).classList.add('active');
+      
+      // Toggle the main warehouse tab buttons
+      document.querySelectorAll('.tabs:first-child .tab-btn').forEach(el => {
+        el.classList.remove('active');
+      });
+      event.target.classList.add('active');
+      
+      // Load data for the selected tab
+      if (tab === 'items') {
+        console.log('[TAB] Loading items data');
+        loadItems();
+      } else if (tab === 'movements') {
+        console.log('[TAB] Loading movements data');
+        loadMovements();
+        
+        // Ensure "All" sub-tab is visible
+        document.getElementById('all').classList.add('active');
+        document.getElementById('in').classList.remove('active');
+        document.getElementById('out').classList.remove('active');
+        
+        // Make sure the "All" button is active too
+        document.querySelectorAll('.tabs:not(:first-child) .tab-btn').forEach(el => {
+          el.classList.remove('active');
+        });
+        document.querySelectorAll('.tabs:not(:first-child) button:first-child').forEach(el => {
+          el.classList.add('active');
+        });
+      }
+    }
+
+    function clearDateFilter() {
+      document.getElementById('filterDateFrom').value = '';
+      document.getElementById('filterDateTo').value = '';
+      updateMovementsTables();
+    }
+
+    function loadItems() {
+      const container = document.getElementById('itemsContainer');
+      if (!container) {
+        console.error('itemsContainer not found');
+        return;
+      }
+      
+      console.log('Starting loadItems...');
+      fetch('/api/warehouse/items/')
+        .then(r => {
+          console.log('Response:', r.status, r.statusText);
+          if (!r.ok) {
+            throw new Error('HTTP ' + r.status);
+          }
+          return r.text();
+        })
+        .then(text => {
+          console.log('Response text length:', text.length);
+          if (!text) throw new Error('Empty response');
+          return JSON.parse(text);
+        })
+        .then(data => {
+          console.log('Data:', data);
+          if (!data.items) {
+            container.innerHTML = '<tr><td colspan="3" style="color: #82868b;">No items property in response</td></tr>';
+            return;
+          }
+          
+          if (data.items.length === 0) {
+            container.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="3">No items yet. Click "New Item" to get started!</td></tr>';
+            return;
+          }
+
+          let html = '';
+          data.items.forEach(item => {
+            html += `<tr>
+              <td>${item.name || 'Unnamed'}</td>
+              <td>${item.description || '-'}</td>
+              <td>${item.quantity}</td>
+              <td style="position: relative; text-align: center;">
+                <button onclick="openItemMenu(event, ${item.id})" class="btn" style="background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 0;">⋮</button>
+                <div class="action-menu item-menu-${item.id}" style="display: none; position: absolute; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 100; min-width: 100px; top: 100%;">
+                  <button onclick="editItem(${item.id})" style="display: block; width: 100%; padding: 10px 12px; border: none; background: none; text-align: left; cursor: pointer; font-size: 0.95em;">Edit</button>
+                  <button onclick="deleteItem(${item.id})" style="display: block; width: 100%; padding: 10px 12px; border: none; background: none; text-align: left; cursor: pointer; font-size: 0.95em; color: red; border-top: 1px solid #eee;">Delete</button>
+                </div>
+              </td>
+            </tr>`;
+          });
+          console.log('Setting HTML:', html);
+          container.innerHTML = html;
+        })
+        .catch(e => {
+          console.error('Error in loadItems:', e.message, e.stack);
+          container.innerHTML = '<tr style="color: red;"><td colspan="3">Error: ' + e.message + '</td></tr>';
+        });
+    }
+
+    function loadMovements() {
+      console.log('[MOVEMENTS] Starting...');
+      fetch('/api/warehouse/items/')
+        .then(r => {
+          console.log('[MOVEMENTS] Status:', r.status);
+          if (!r.ok) {
+            throw new Error('HTTP ' + r.status);
+          }
+          return r.text();
+        })
+        .then(text => {
+          console.log('[MOVEMENTS] Got response, parsing...');
+          return JSON.parse(text);
+        })
+        .then(data => {
+          console.log('[MOVEMENTS] Data:', data);
+          allMovements = [];
+          if (data.items) {
+            data.items.forEach((item, idx) => {
+              console.log(`[MOVEMENTS] Item: ${item.name}, movements:`, item.movements);
+              if (item.movements && Array.isArray(item.movements)) {
+                item.movements.forEach(m => {
+                  const mov = { ...m, item_id: item.id, item_name: item.name };
+                  console.log(`[MOVEMENTS] Adding ${m.type}:`, mov);
+                  allMovements.push(mov);
+                });
+              }
+            });
+          }
+          console.log('[MOVEMENTS] Total:', allMovements.length, 'Types:', allMovements.map(m => m.type));
+          allMovements.sort((a, b) => new Date(b.date) - new Date(a.date));
+          updateMovementsTables();
+        })
+        .catch(e => console.error('[MOVEMENTS] Error:', e.message));
+    }
+
+    function updateMovementsTables() {
+      console.log('[UPDATE] Starting updateMovementsTables');
+      const allBody = document.getElementById('movementsAllBody');
+      const inBody = document.getElementById('movementsInBody');
+      const outBody = document.getElementById('movementsOutBody');
+      
+      console.log('[UPDATE] Found bodies:', {allBody: !!allBody, inBody: !!inBody, outBody: !!outBody});
+
+      const filterByItem = document.getElementById('filterByItem');
+      const filterDateFrom = document.getElementById('filterDateFrom');
+      const filterDateTo = document.getElementById('filterDateTo');
+      
+      if (!filterByItem) {
+        console.warn('[UPDATE] filterByItem element not found!');
+      }
+      
+      const itemFilterVal = filterByItem ? filterByItem.value : '';
+      const dateFromVal = filterDateFrom ? filterDateFrom.value : '';
+      const dateToVal = filterDateTo ? filterDateTo.value : '';
+      
+      console.log('[UPDATE] Filter values:', {itemFilterVal, dateFromVal, dateToVal});
+      console.log('[UPDATE] All movements count:', allMovements.length);
+
+      let filteredMovements = allMovements.filter(m => {
+        if (itemFilterVal && m.item_id != itemFilterVal) return false;
+        if (dateFromVal && m.date < dateFromVal) return false;
+        if (dateToVal && m.date > dateToVal) return false;
+        return true;
+      });
+      
+      console.log('[UPDATE] Filtered movements count:', filteredMovements.length);
+
+      // Update item filter dropdown
+      if (filterByItem) {
+        console.log('[UPDATE] Populating item filter dropdown');
+        allMovements.forEach(m => {
+          if (!filterByItem.querySelector('option[value="' + m.item_id + '"]')) {
+            const opt = document.createElement('option');
+            opt.value = m.item_id;
+            opt.textContent = m.item_name;
+            filterByItem.appendChild(opt);
+            console.log('[UPDATE] Added option:', m.item_name);
+          }
+        });
+      }
+
+      if (!allBody || !inBody || !outBody) {
+        console.error('[UPDATE] Missing tbody elements!');
+        return;
+      }
+
+      if (filteredMovements.length === 0) {
+        console.log('[UPDATE] No filtered movements, setting empty states');
+        allBody.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="6">No movements found</td></tr>';
+        inBody.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="5">No items received in this period</td></tr>';
+        outBody.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="5">No items shipped in this period</td></tr>';
+        return;
+      }
+
+      let allHtml = '', inHtml = '', outHtml = '';
+      filteredMovements.forEach((m, idx) => {
+        console.log(`[UPDATE] Movement ${idx}:`, m);
+        const badge = m.type === 'in' ? '<span class="badge badge-in">IN</span>' : '<span class="badge badge-out">OUT</span>';
+        
+        const allActionMenu = `<td style="position: relative; text-align: center;">
+          <button onclick="openMovementMenu(event, ${m.id})" class="btn" style="background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 0;">⋮</button>
+          <div class="action-menu movement-menu-${m.id}" style="display: none; position: absolute; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 100; min-width: 100px; top: 100%;">
+            <button onclick="editMovement(${m.id})" style="display: block; width: 100%; padding: 10px 12px; border: none; background: none; text-align: left; cursor: pointer; font-size: 0.95em;">Edit</button>
+            <button onclick="deleteMovement(${m.id})" style="display: block; width: 100%; padding: 10px 12px; border: none; background: none; text-align: left; cursor: pointer; font-size: 0.95em; color: red; border-top: 1px solid #eee;">Delete</button>
+          </div>
+        </td>`;
+        
+        allHtml += `<tr><td>${m.item_name}</td><td>${badge}</td><td>${m.quantity}</td><td>${m.date}</td><td>${m.description || '-'}</td>${allActionMenu}</tr>`;
+        
+        if (m.type === 'in') {
+          console.log(`[UPDATE] Adding to IN: ${m.item_name}`);
+          inHtml += `<tr><td>${m.item_name}</td><td>${m.quantity}</td><td>${m.date}</td><td>${m.description || '-'}</td>${allActionMenu}</tr>`;
+        } else if (m.type === 'out') {
+          console.log(`[UPDATE] Adding to OUT: ${m.item_name}`);
+          outHtml += `<tr><td>${m.item_name}</td><td>${m.quantity}</td><td>${m.date}</td><td>${m.description || '-'}</td>${allActionMenu}</tr>`;
+        } else {
+          console.warn(`[UPDATE] Unknown type: ${m.type}`);
+        }
+      });
+
+      console.log('[UPDATE] Final HTML counts - All:', allHtml.length, 'In:', inHtml.length, 'Out:', outHtml.length);
+      console.log('[UPDATE] Setting HTML content');
+      allBody.innerHTML = allHtml || '<tr style="text-align: center; color: #82868b;"><td colspan="6">No movements</td></tr>';
+      inBody.innerHTML = inHtml || '<tr style="text-align: center; color: #82868b;"><td colspan="5">No items received</td></tr>';
+      outBody.innerHTML = outHtml || '<tr style="text-align: center; color: #82868b;"><td colspan="5">No items shipped</td></tr>';
+      console.log('[UPDATE] Complete');
+    }
+
+    function clearFilters() {
+      document.getElementById('filterByItem').value = '';
+      document.getElementById('filterDateFrom').value = '';
+      document.getElementById('filterDateTo').value = '';
+      updateMovementsTables();
+    }
+
+    function openMovementModal() {
+      // Load items into selector
+      const selector = document.getElementById('movementItem');
+      selector.innerHTML = '<option value="">-- Select an item --</option>';
+      
+      fetch('/api/warehouse/items/')
+        .then(r => r.json())
+        .then(data => {
+          if (data.items && data.items.length > 0) {
+            data.items.forEach(item => {
+              const opt = document.createElement('option');
+              opt.value = item.id;
+              opt.textContent = item.name + ' (Qty: ' + item.quantity + ')';
+              selector.appendChild(opt);
+            });
+          }
+        })
+        .catch(e => alert('Error loading items: ' + e));
+      
+      document.getElementById('movementQty').value = '';
+      document.getElementById('movementDate').value = today;
+      document.getElementById('movementNotes').value = '';
+      document.querySelector('input[name="movementType"][value="in"]').checked = true;
+      document.getElementById('movementModal').classList.add('active');
+      selector.focus();
+    }
+
+    function closeMovementModal() {
+      document.getElementById('movementModal').classList.remove('active');
+    }
+
+    function saveMovement() {
+      const itemId = document.getElementById('movementItem').value;
+      const type = document.querySelector('input[name="movementType"]:checked').value;
+      const qty = parseInt(document.getElementById('movementQty').value);
+      const date = document.getElementById('movementDate').value;
+      const notes = document.getElementById('movementNotes').value.trim();
+
+      if (!itemId || !qty || !date) {
+        alert('Please fill all required fields');
+        return;
+      }
+
+      fetch('/api/warehouse/entry/add/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}',
+        },
+        body: JSON.stringify({
+          item_id: parseInt(itemId),
+          type: type,
+          quantity: qty,
+          date: date,
+          description: notes
+        })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success || data.id) {
+          closeMovementModal();
+          loadMovements();
+        } else {
+          alert('Error: ' + (data.error || 'Failed to save'));
+        }
+      })
+      .catch(e => alert('Error: ' + e));
+    }
+
+    function openAddItemModal() {
+      document.getElementById('newItemName').value = '';
+      document.getElementById('newItemQty').value = '0';
+      document.getElementById('newItemDesc').value = '';
+      document.getElementById('addItemModal').classList.add('active');
+    }
+
+    function closeAddItemModal() {
+      document.getElementById('addItemModal').classList.remove('active');
+    }
+
+    function closeQuickEntryModal() {
+      document.getElementById('quickEntryModal').classList.remove('active');
+      currentItemId = null;
+      currentEntryType = null;
+    }
+
+    function saveNewItem() {
+      const name = document.getElementById('newItemName').value.trim();
+      const qty = parseInt(document.getElementById('newItemQty').value) || 0;
+      const desc = document.getElementById('newItemDesc').value.trim();
+
+      if (!name) {
+        alert('Please enter item name');
+        return;
+      }
+
+      fetch('/api/warehouse/item/create/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}',
+        },
+        body: JSON.stringify({ name, quantity: qty, description: desc })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success || data.id) {
+          closeAddItemModal();
+          loadItems();
+          loadMovements();
+        } else {
+          alert('Error: ' + (data.error || 'Failed'));
+        }
+      })
+      .catch(e => alert('Error: ' + e));
+    }
+
+    // Action menu management
+    function openItemMenu(event, itemId) {
+      event.stopPropagation();
+      document.querySelectorAll('.action-menu').forEach(menu => menu.style.display = 'none');
+      const menu = document.querySelector('.item-menu-' + itemId);
+      if (menu) menu.style.display = 'block';
+    }
+
+    function openMovementMenu(event, movementId) {
+      event.stopPropagation();
+      document.querySelectorAll('.action-menu').forEach(menu => menu.style.display = 'none');
+      const menu = document.querySelector('.movement-menu-' + movementId);
+      if (menu) menu.style.display = 'block';
+    }
+
+    // Edit item
+    function editItem(itemId) {
+      fetch('/api/warehouse/items/')
+        .then(r => r.json())
+        .then(data => {
+          if (!data.items) return;
+          const item = data.items.find(i => i.id === itemId);
+          if (!item) return;
+          
+          const name = prompt('Item name:', item.name);
+          if (name === null) return;
+          
+          const desc = prompt('Description:', item.description || '');
+          if (desc === null) return;
+          
+          const qty = prompt('Quantity:', item.quantity);
+          if (qty === null) return;
+          
+          fetch('/api/warehouse/item/' + itemId + '/update/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: JSON.stringify({ name, description: desc, quantity: parseInt(qty) })
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              console.log('Item updated');
+              loadItems();
+              loadMovements();
+            } else {
+              alert('Error: ' + (data.error || 'Failed'));
+            }
+          })
+          .catch(e => alert('Error: ' + e));
+        });
+    }
+
+    // Delete item
+    function deleteItem(itemId) {
+      if (confirm('Are you sure you want to delete this item?')) {
+        fetch('/api/warehouse/item/' + itemId + '/delete/', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+          }
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            console.log('Item deleted');
+            loadItems();
+            loadMovements();
+          } else {
+            alert('Error: ' + (data.error || 'Failed'));
+          }
+        })
+        .catch(e => alert('Error: ' + e));
+      }
+    }
+
+    // Edit movement
+    function editMovement(movementId) {
+      fetch('/api/warehouse/items/')
+        .then(r => r.json())
+        .then(data => {
+          if (!data.items) return;
+          
+          const movement = allMovements.find(m => m.id === movementId);
+          if (!movement) return;
+          
+          const quantity = prompt('Quantity:', movement.quantity);
+          if (quantity === null) return;
+          
+          const description = prompt('Description:', movement.description || '');
+          if (description === null) return;
+          
+          const date = prompt('Date (YYYY-MM-DD):', movement.date);
+          if (date === null) return;
+          
+          // Delete old movement and create new one
+          fetch('/api/warehouse/entry/' + movementId + '/delete/', {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': '{{ csrf_token }}'
+            }
+          })
+          .then(r => r.json())
+          .then(deleteData => {
+            if (deleteData.success) {
+              // Create new movement with updated data
+              fetch('/api/warehouse/entry/add/', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': '{{ csrf_token }}',
+                },
+                body: JSON.stringify({
+                  item_id: movement.item_id,
+                  type: movement.type,
+                  quantity: parseInt(quantity),
+                  date: date,
+                  description: description
+                })
+              })
+              .then(r => r.json())
+              .then(createData => {
+                if (createData.success) {
+                  console.log('Movement updated');
+                  loadMovements();
+                } else {
+                  alert('Error updating: ' + (createData.error || 'Failed'));
+                }
+              })
+              .catch(e => alert('Error: ' + e));
+            }
+          });
+        });
+    }
+
+    // Delete movement
+    function deleteMovement(movementId) {
+      if (confirm('Are you sure you want to delete this movement?')) {
+        fetch('/api/warehouse/entry/' + movementId + '/delete/', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+          }
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            console.log('Movement deleted');
+            loadMovements();
+          } else {
+            alert('Error: ' + (data.error || 'Failed'));
+          }
+        })
+        .catch(e => alert('Error: ' + e));
+      }
+    }
+
+    // Close menus on document click
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.action-menu').forEach(menu => menu.style.display = 'none');
+    });
+
+    // Close modals on background click
+    window.addEventListener('click', (e) => {
+      if (e.target.id === 'addItemModal') closeAddItemModal();
+      if (e.target.id === 'movementModal') closeMovementModal();
+    });
+  </script>
+</body>
+</html>

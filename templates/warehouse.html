@@ -1,0 +1,526 @@
+{% load number_format %}
+
+<!DOCTYPE html>
+<html lang="en" style="font-size: 14px;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warehouse - FinTrack</title>
+  <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    
+    body {
+      font-family: 'Golos Text', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f8f7fa;
+      margin: 0;
+      color: #5e5873;
+    }
+
+    .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    
+    .btn {
+      transition: all 0.2s;
+      font-weight: 500;
+      border-radius: 6px;
+      padding: 8px 16px;
+      cursor: pointer;
+      border: none;
+      font-size: 14px;
+      font-family: 'Golos Text', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    .btn-primary { background: #7367f0; color: white; }
+    .btn-primary:hover { background: #5f54d6; }
+    
+    .btn-danger { background: #ea5455; color: white; }
+    .btn-danger:hover { background: #d63939; }
+    
+    .btn-secondary { background: #82868b; color: white; }
+    .btn-secondary:hover { background: #6e7175; }
+    
+    .input-field {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d8d6de;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: 'Golos Text', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
+    .input-field:focus {
+      outline: none;
+      border-color: #7367f0;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .table th {
+      background: #f8f7fa;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .table td {
+      padding: 12px;
+      border-bottom: 1px solid #ebe9f1;
+    }
+
+    .table tr:hover { background: #fafafa; }
+
+    .badge {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      display: inline-block;
+    }
+
+    .badge-in { background: #d4f4e2; color: #28c76f; }
+    .badge-out { background: #fce4e4; color: #ea5455; }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #ebe9f1;
+    }
+
+    .tab-btn {
+      padding: 12px 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      color: #82868b;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      font-size: 0.95em;
+    }
+
+    .tab-btn.active {
+      color: #7367f0;
+      border-bottom-color: #7367f0;
+    }
+
+    .header {
+      width: 100%;
+      padding: 16px 32px;
+      border-bottom: 1px solid #ebe9f1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .nav {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav a {
+      padding: 8px 16px;
+      background: transparent;
+      color: #5e5873;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+
+    .nav a.active {
+      background: #7367f0;
+      color: white;
+    }
+
+    .nav a:hover {
+      background: #f0f0f0;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 24px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .modal h2 {
+      margin-top: 0;
+      color: #5e5873;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #5e5873;
+      font-size: 0.9em;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" style="width: 100%; height: 100%; overflow: auto;">
+    <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
+      <div style="width: 100%; padding: 16px 32px; border-bottom: 1px solid #ebe9f1; display: flex; justify-content: space-between; align-items: center; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+        <div style="display: flex; align-items: center; gap: 32px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #7367f0, #5f54d6); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 1.2em;">F</div>
+            <h2 style="margin: 0; font-size: 1.3em; font-weight: 700; color: #5e5873;">FinTrack</h2>
+          </div>
+          <nav style="display: flex; gap: 8px;">
+            <a href="{% url 'dashboard' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+              Dashboard
+            </a>
+            {% if request.user.is_staff %}
+            <a href="{% url 'users' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              Users
+            </a>
+            <a href="{% url 'monthly' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              Employees
+            </a>
+            <a href="{% url 'warehouse' %}" class="btn" style="background: #7367f0; color: white; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+              Warehouse
+            </a>
+            {% endif %}
+          </nav>
+        </div>
+        <form method="POST" action="{% url 'logout' %}" style="margin: 0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Logout
+          </button>
+        </form>
+      </div>
+
+      <div style="flex: 1; padding: 24px; overflow-y: auto;">
+    <div class="container">
+      <div style="margin-bottom: 24px;">
+        <h1 style="font-size: 2em; margin: 0; color: #5e5873; font-weight: 700;">Warehouse</h1>
+        <p style="color: #82868b; margin-top: 4px;">Manage inventory</p>
+      </div>
+
+      <div class="card" style="padding: 24px;">
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab('items')">Items in Stock</button>
+          <button class="tab-btn" onclick="switchTab('movements')">In/Out Movements</button>
+        </div>
+
+        <!-- Items Tab -->
+        <div id="items" style="display: block;">
+          <div class="section-header">
+            <h2 style="font-size: 1.3em; margin: 0; font-weight: 600;">All Items</h2>
+            <button onclick="document.getElementById('addItemModal').classList.add('active')" class="btn btn-primary">+ New Item</button>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Description</th>
+                  <th>Quantity</th>
+                  <th style="width: 50px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if items %}
+                  {% for item in items %}
+                  <tr>
+                    <td style="font-weight: 500;">{{ item.name }}</td>
+                    <td>{{ item.description|default:"-" }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td style="text-align: center;">
+                      <form method="POST" action="{% url 'api_warehouse_delete_item' item.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;" onclick="return confirm('Delete this item?')">Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr style="text-align: center; color: #82868b;">
+                    <td colspan="4">No items yet</td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Movements Tab -->
+        <div id="movements" style="display: none;">
+          <div class="section-header">
+            <h2 style="font-size: 1.3em; margin: 0; font-weight: 600;">Movement History</h2>
+            <button onclick="document.getElementById('addMovementModal').classList.add('active')" class="btn btn-primary">+ Add Movement</button>
+          </div>
+
+          <!-- Filters -->
+          <div style="margin-bottom: 20px; padding: 16px; background: #f8f7fa; border-radius: 6px;">
+            <form method="GET" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: end;">
+              <input type="hidden" name="tab" id="activeTab" value="movements">
+              <div style="flex: 1; min-width: 150px;">
+                <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9em;">Item</label>
+                <select name="item_id" class="input-field" onchange="document.getElementById('activeTab').value='movements'; this.form.submit();">
+                  <option value="">All Items</option>
+                  {% for item in items %}
+                    <option value="{{ item.id }}" {% if request.GET.item_id|add:"0" == item.id %}selected{% endif %}>{{ item.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div style="flex: 1; min-width: 150px;">
+                <label style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9em;">Type</label>
+                <select name="type" class="input-field" onchange="document.getElementById('activeTab').value='movements'; this.form.submit();">
+                  <option value="">All Types</option>
+                  <option value="in" {% if request.GET.type == 'in' %}selected{% endif %}>Items In</option>
+                  <option value="out" {% if request.GET.type == 'out' %}selected{% endif %}>Items Out</option>
+                </select>
+              </div>
+              <div style="flex: 0 0 auto;">
+                <a href="{% url 'warehouse' %}" class="btn btn-secondary" style="text-decoration: none; display: inline-block;">Clear</a>
+              </div>
+            </form>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Type</th>
+                  <th>Quantity</th>
+                  <th>Date</th>
+                  <th>Notes</th>
+                  <th style="width: 50px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if filtered_movements %}
+                  {% for movement in filtered_movements %}
+                  <tr>
+                    <td>{{ movement.item.name }}</td>
+                    <td>
+                      {% if movement.type == 'in' %}
+                        <span class="badge badge-in">IN</span>
+                      {% else %}
+                        <span class="badge badge-out">OUT</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ movement.quantity }}</td>
+                    <td>{{ movement.date|date:"Y-m-d" }}</td>
+                    <td>{{ movement.description|default:"-" }}</td>
+                    <td style="text-align: center;">
+                      <form method="POST" action="{% url 'api_warehouse_delete_movement' movement.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;" onclick="return confirm('Delete this movement?')">Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr style="text-align: center; color: #82868b;">
+                    <td colspan="6">No movements found</td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Item Modal -->
+  <div id="addItemModal" class="modal">
+    <div class="modal-content">
+      <h2>Add New Item</h2>
+      <form method="POST" action="{% url 'api_warehouse_create_item' %}">
+        {% csrf_token %}
+        <div class="form-group">
+          <label>Item Name</label>
+          <input type="text" name="name" class="input-field" placeholder="Enter item name" required>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" name="description" class="input-field" placeholder="Enter description">
+        </div>
+        <div class="form-group">
+          <label>Quantity</label>
+          <input type="number" name="quantity" class="input-field" placeholder="Enter quantity" min="0" required>
+        </div>
+        <div class="modal-buttons">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('addItemModal').classList.remove('active')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Movement Modal -->
+  <div id="addMovementModal" class="modal">
+    <div class="modal-content">
+      <h2>Add Movement</h2>
+      <form method="POST" action="{% url 'api_warehouse_add_movement' %}">
+        {% csrf_token %}
+        <div class="form-group">
+          <label>Item</label>
+          <select name="item_id" class="input-field" required>
+            <option value="">-- Select an item --</option>
+            {% for item in items %}
+              <option value="{{ item.id }}">{{ item.name }} (Qty: {{ item.quantity }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select name="type" class="input-field" required>
+            <option value="">-- Select type --</option>
+            <option value="in">Items In</option>
+            <option value="out">Items Out</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Quantity</label>
+          <input type="number" name="quantity" class="input-field" placeholder="Enter quantity" min="1" required>
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" name="date" class="input-field" required>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <input type="text" name="description" class="input-field" placeholder="Optional notes">
+        </div>
+        <div class="modal-buttons">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('addMovementModal').classList.remove('active')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Movement</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tab) {
+      document.querySelectorAll('[id="items"], [id="movements"]').forEach(el => el.style.display = 'none');
+      document.getElementById(tab).style.display = 'block';
+      
+      // Update active button
+      const buttons = document.querySelectorAll('.tab-btn');
+      buttons.forEach((btn, idx) => {
+        if ((idx === 0 && tab === 'items') || (idx === 1 && tab === 'movements')) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    // Restore tab state after page load if filter was applied
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tab = urlParams.get('tab');
+      const hasFilters = urlParams.get('item_id') || urlParams.get('type');
+      
+      if (hasFilters && tab === 'movements') {
+        switchTab('movements');
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      const dateInput = document.querySelector('input[name="date"]');
+      if (dateInput) {
+        dateInput.value = today;
+      }
+    });
+
+    // Close modal on background click
+    document.querySelectorAll('.modal').forEach(modal => {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.classList.remove('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
