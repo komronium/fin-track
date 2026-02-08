@@ -223,6 +223,53 @@
       align-items: center !important;
       gap: 6px !important;
     }
+
+    /* Mobile - Hide Logo, Show Only Icons */
+    @media (max-width: 768px) {
+      div[style*="display: flex; align-items: center; gap: 8px"] {
+        display: none !important;
+      }
+      
+      nav[style*="display: flex; gap: 8px"] {
+        width: 100% !important;
+        justify-content: center !important;
+        flex-wrap: nowrap !important;
+        gap: 4px !important;
+      }
+      
+      nav[style*="display: flex; gap: 8px"] a {
+        padding: 8px 12px !important;
+        font-size: 0 !important;
+        flex: 1 !important;
+        max-width: 60px !important;
+        justify-content: center !important;
+      }
+      
+      nav[style*="display: flex; gap: 8px"] a svg {
+        display: inline-block !important;
+        width: 20px !important;
+        height: 20px !important;
+      }
+      
+      form[method="POST"][action*="logout"] {
+        margin: 0 !important;
+      }
+      
+      form[method="POST"][action*="logout"] button {
+        padding: 8px 12px !important;
+        font-size: 0 !important;
+        flex: 1 !important;
+        max-width: 60px !important;
+        justify-content: center !important;
+      }
+      
+      form[method="POST"][action*="logout"] button svg {
+        display: inline-block !important;
+        width: 20px !important;
+        height: 20px !important;
+        margin: 0 !important;
+      }
+    }
   </style>
 </head>
 <body class="h-full" style="background: rgb(248, 247, 250); margin: 0px; color: rgb(94, 88, 115); font-family: 'Golos Text', sans-serif;">
