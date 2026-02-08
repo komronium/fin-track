@@ -211,6 +211,33 @@
       margin-top: 20px;
     }
 
+    /* Unified Navbar Styling */
+    nav[style*="display: flex; gap: 8px"] {
+      display: flex !important;
+      gap: 8px !important;
+      flex-wrap: nowrap !important;
+    }
+
+    nav[style*="display: flex; gap: 8px"] a {
+      padding: 8px 16px !important;
+      white-space: nowrap !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+    }
+
+    form[method="POST"][action*="logout"] {
+      margin: 0 !important;
+    }
+
+    form[method="POST"][action*="logout"] button {
+      padding: 8px 16px !important;
+      white-space: nowrap !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+    }
+
     /* Mobile Responsive Navbar */
     @media (max-width: 768px) {
       html { font-size: 12px; }
