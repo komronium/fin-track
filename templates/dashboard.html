@@ -219,6 +219,61 @@
     .dots-btn:hover {
       color: #5e5873;
     }
+
+    /* Mobile Responsive Navbar */
+    @media (max-width: 768px) {
+      html { font-size: 12px; }
+      
+      div[style*="display: flex; align-items: center; gap: 32px"] {
+        width: 100% !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        align-items: stretch !important;
+      }
+      
+      nav[style*="display: flex; gap: 8px"] {
+        width: 100% !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+      }
+      
+      nav[style*="display: flex; gap: 8px"] a {
+        flex: 1 !important;
+        min-width: 70px !important;
+        padding: 8px 10px !important;
+        font-size: 11px !important;
+      }
+      
+      @media (max-width: 600px) {
+        nav[style*="display: flex; gap: 8px"] a {
+          padding: 8px 6px !important;
+          font-size: 0 !important;
+        }
+        
+        nav[style*="display: flex; gap: 8px"] a svg {
+          display: inline-block;
+          width: 18px !important;
+          height: 18px !important;
+        }
+        
+        form[method="POST"][action*="logout"] button {
+          width: 100% !important;
+          padding: 8px !important;
+          font-size: 0 !important;
+        }
+        
+        form[method="POST"][action*="logout"] button svg {
+          display: inline-block;
+          width: 18px !important;
+          height: 18px !important;
+          margin-right: 0 !important;
+        }
+      }
+    }
+
+    @media (max-width: 480px) {
+      html { font-size: 11px !important; }
+    }
   </style>
 </head>
 <body class="h-full" style="background: rgb(248, 247, 250); margin: 0px; color: rgb(94, 88, 115); font-family: 'Golos Text', sans-serif;">
