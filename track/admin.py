@@ -1,10 +1,16 @@
 from django.contrib import admin
 
-from track.models import PaymentMethod, Transaction
+from track.models import PaymentMethod, Transaction, Employee
+
 
 @admin.register(PaymentMethod)
 class PaymentMethodAdmin(admin.ModelAdmin):
     list_display = ('name',)
+
+
+@admin.register(Employee)
+class EmployeeAdmin(admin.ModelAdmin):
+    pass
 
 
 @admin.register(Transaction)
