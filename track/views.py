@@ -21,14 +21,19 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     def get_transactions(self):
         return Transaction.objects.all()
 
-    def set_balance(self, transaction, kwargs):
-        kwargs['incomes'] = transaction.filter(
-            type=Transaction.TYPE_INCOME
-        ).aggregate(total=Coalesce(Sum('amount'), 0))['total']
-        kwargs['expenses'] = transaction.filter(
-            type=Transaction.TYPE_EXPENSE
-        ).aggregate(total=Coalesce(Sum('amount'), 0))['total']
-        kwargs['balance'] = kwargs['incomes'] - kwargs['expenses']
+    def set_balance(self, transactions, kwargs):
+        """Stats per currency: UZS, USD, AFN"""
+        for curr in ['uzs', 'usd', 'afn']:
+            qs = transactions.filter(currency=curr)
+            inc = qs.filter(type=Transaction.TYPE_INCOME).aggregate(
+                total=Coalesce(Sum('amount'), 0)
+            )['total']
+            exp = qs.filter(type=Transaction.TYPE_EXPENSE).aggregate(
+                total=Coalesce(Sum('amount'), 0)
+            )['total']
+            kwargs[f'incomes_{curr}'] = inc
+            kwargs[f'expenses_{curr}'] = exp
+            kwargs[f'balance_{curr}'] = inc - exp
 
     def get_context_data(self, **kwargs):
         transactions = self.get_transactions()
@@ -74,11 +79,17 @@ class TransactionListAPIView(LoginRequiredMixin, View):
         if date_to:
             transactions = transactions.filter(date__lte=date_to)
         
+        # Filter by currency
+        currency = request.GET.get('currency')
+        if currency and currency in ('uzs', 'usd', 'afn'):
+            transactions = transactions.filter(currency=currency)
+        
         data = {
             'transactions': [
                 {
                     'id': t.id,
                     'type': t.type,
+                    'currency': t.currency,
                     'amount': t.amount,
                     'description': t.description,
                     'date': t.date.isoformat(),
@@ -117,21 +128,25 @@ class StatsAPIView(LoginRequiredMixin, View):
         if date_to:
             transactions = transactions.filter(date__lte=date_to)
         
-        incomes = transactions.filter(
-            type=Transaction.TYPE_INCOME
-        ).aggregate(total=Coalesce(Sum('amount'), 0))['total']
+        # Filter by currency
+        currency = request.GET.get('currency')
+        if currency and currency in ('uzs', 'usd', 'afn'):
+            transactions = transactions.filter(currency=currency)
         
-        expenses = transactions.filter(
-            type=Transaction.TYPE_EXPENSE
-        ).aggregate(total=Coalesce(Sum('amount'), 0))['total']
+        result = {}
+        for curr in ['uzs', 'usd', 'afn']:
+            qs = transactions.filter(currency=curr)
+            inc = qs.filter(type=Transaction.TYPE_INCOME).aggregate(
+                total=Coalesce(Sum('amount'), 0)
+            )['total']
+            exp = qs.filter(type=Transaction.TYPE_EXPENSE).aggregate(
+                total=Coalesce(Sum('amount'), 0)
+            )['total']
+            result[f'incomes_{curr}'] = inc
+            result[f'expenses_{curr}'] = exp
+            result[f'balance_{curr}'] = inc - exp
         
-        balance = incomes - expenses
-        
-        return JsonResponse({
-            'incomes': incomes,
-            'expenses': expenses,
-            'balance': balance,
-        })
+        return JsonResponse(result)
 
 
 def check_staff_permission(user):
@@ -157,12 +172,16 @@ class CreateTransactionAPIView(LoginRequiredMixin, View):
         try:
             data = json.loads(request.body)
             
+            currency = data.get('currency', 'uzs')
+            if currency not in ('uzs', 'usd', 'afn'):
+                currency = 'uzs'
             transaction = Transaction.objects.create(
                 type=data.get('type'),
                 amount=int(data.get('amount')),
                 description=data.get('description', ''),
                 date=data.get('date'),
                 method_id=int(data.get('method')),
+                currency=currency,
             )
             
             return JsonResponse({
@@ -186,6 +205,7 @@ class TransactionDetailAPIView(LoginRequiredMixin, View):
             return JsonResponse({
                 'id': transaction.id,
                 'type': transaction.type,
+                'currency': transaction.currency,
                 'amount': transaction.amount,
                 'description': transaction.description,
                 'date': transaction.date.isoformat(),
@@ -211,6 +231,9 @@ class TransactionDetailAPIView(LoginRequiredMixin, View):
             transaction.description = data.get('description', transaction.description)
             transaction.date = data.get('date', transaction.date)
             transaction.method_id = int(data.get('method', transaction.method_id))
+            curr = data.get('currency')
+            if curr in ('uzs', 'usd', 'afn'):
+                transaction.currency = curr
             transaction.save()
             
             return JsonResponse({
@@ -860,6 +883,7 @@ class WarehouseItemListAPIView(LoginRequiredMixin, View):
                     'id': m.id,
                     'type': m.type,
                     'quantity': m.quantity,
+                    'quantity_kg': str(m.quantity_kg),
                     'date': m.date.isoformat() if hasattr(m.date, 'isoformat') else str(m.date),
                     'description': m.description or ''
                 })
@@ -869,6 +893,7 @@ class WarehouseItemListAPIView(LoginRequiredMixin, View):
                 'name': item.name,
                 'description': item.description or '',
                 'quantity': item.quantity,
+                'quantity_kg': str(item.quantity_kg),
                 'movements': movements_list
             })
         
@@ -891,11 +916,13 @@ class CreateWarehouseItemAPIView(LoginRequiredMixin, View):
                 data = json.loads(request.body)
                 name = data.get('name', '').strip()
                 quantity = int(data.get('quantity', 0))
+                quantity_kg = Decimal(str(data.get('quantity_kg', 0)))
                 description = data.get('description', '').strip()
             else:
                 # Form data
                 name = request.POST.get('name', '').strip()
                 quantity = int(request.POST.get('quantity', 0))
+                quantity_kg = Decimal(str(request.POST.get('quantity_kg', 0) or 0))
                 description = request.POST.get('description', '').strip()
             
             if not name:
@@ -906,6 +933,7 @@ class CreateWarehouseItemAPIView(LoginRequiredMixin, View):
             item = WarehouseItem.objects.create(
                 name=name,
                 quantity=quantity,
+                quantity_kg=quantity_kg,
                 description=description
             )
             
@@ -941,6 +969,7 @@ class WarehouseMovementAPIView(LoginRequiredMixin, View):
                 item_id = int(data.get('item_id'))
                 movement_type = data.get('type')  # 'in' or 'out'
                 quantity = int(data.get('quantity', 0))
+                quantity_kg = Decimal(str(data.get('quantity_kg', 0) or 0))
                 date = data.get('date', datetime.now().date())
                 description = data.get('description', '').strip()
             else:
@@ -948,10 +977,11 @@ class WarehouseMovementAPIView(LoginRequiredMixin, View):
                 item_id = int(request.POST.get('item_id'))
                 movement_type = request.POST.get('type')
                 quantity = int(request.POST.get('quantity', 0))
+                quantity_kg = Decimal(str(request.POST.get('quantity_kg', 0) or 0))
                 date = request.POST.get('date', str(datetime.now().date()))
                 description = request.POST.get('description', '').strip()
             
-            if not item_id or not movement_type or quantity <= 0:
+            if not item_id or not movement_type or (quantity <= 0 and quantity_kg <= 0):
                 if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
                     return JsonResponse({'success': False, 'error': 'Invalid data'}, status=400)
                 return redirect('warehouse')
@@ -968,15 +998,18 @@ class WarehouseMovementAPIView(LoginRequiredMixin, View):
                 item=item,
                 type=movement_type,
                 quantity=quantity,
+                quantity_kg=quantity_kg,
                 date=date,
                 description=description
             )
             
-            # Update item quantity
+            # Update item quantity and quantity_kg
             if movement_type == 'in':
                 item.quantity += quantity
+                item.quantity_kg += quantity_kg
             else:
                 item.quantity = max(0, item.quantity - quantity)
+                item.quantity_kg = max(Decimal('0'), item.quantity_kg - quantity_kg)
             
             item.save()
             
@@ -1012,13 +1045,16 @@ class DeleteWarehouseMovementAPIView(LoginRequiredMixin, View):
             movement = WarehouseMovement.objects.get(id=movement_id)
             item = movement.item
             
-            # Reverse the quantity update
+            # Reverse the quantity and quantity_kg update
             if movement.type == 'in':
                 item.quantity -= movement.quantity
+                item.quantity_kg -= movement.quantity_kg
             else:
                 item.quantity += movement.quantity
+                item.quantity_kg += movement.quantity_kg
             
             item.quantity = max(0, item.quantity)
+            item.quantity_kg = max(Decimal('0'), item.quantity_kg)
             item.save()
             
             movement.delete()
@@ -1089,6 +1125,8 @@ class UpdateWarehouseItemAPIView(LoginRequiredMixin, View):
                 item.description = data['description']
             if 'quantity' in data:
                 item.quantity = int(data['quantity'])
+            if 'quantity_kg' in data:
+                item.quantity_kg = Decimal(str(data['quantity_kg']))
             
             item.save()
             
@@ -1099,6 +1137,7 @@ class UpdateWarehouseItemAPIView(LoginRequiredMixin, View):
                     'name': item.name,
                     'description': item.description,
                     'quantity': item.quantity,
+                    'quantity_kg': str(item.quantity_kg),
                 }
             })
         except WarehouseItem.DoesNotExist:

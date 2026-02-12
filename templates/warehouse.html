@@ -375,6 +375,7 @@
                   <th>Item</th>
                   <th>Description</th>
                   <th>Quantity</th>
+                  <th>Quantity (kg)</th>
                   <th style="width: 50px;">Actions</th>
                 </tr>
               </thead>
@@ -385,6 +386,7 @@
                     <td style="font-weight: 500;">{{ item.name }}</td>
                     <td>{{ item.description|default:"-" }}</td>
                     <td>{{ item.quantity }}</td>
+                    <td>{{ item.quantity_kg|floatformat:2 }}</td>
                     <td style="text-align: center;">
                       <form method="POST" action="{% url 'api_warehouse_delete_item' item.id %}" style="display: inline;">
                         {% csrf_token %}
@@ -395,7 +397,7 @@
                   {% endfor %}
                 {% else %}
                   <tr style="text-align: center; color: #82868b;">
-                    <td colspan="4">No items yet</td>
+                    <td colspan="5">No items yet</td>
                   </tr>
                 {% endif %}
               </tbody>
@@ -444,6 +446,7 @@
                   <th>Item</th>
                   <th>Type</th>
                   <th>Quantity</th>
+                  <th>Quantity (kg)</th>
                   <th>Date</th>
                   <th>Notes</th>
                   <th style="width: 50px;">Actions</th>
@@ -462,6 +465,7 @@
                       {% endif %}
                     </td>
                     <td>{{ movement.quantity }}</td>
+                    <td>{{ movement.quantity_kg|floatformat:2 }}</td>
                     <td>{{ movement.date|date:"Y-m-d" }}</td>
                     <td>{{ movement.description|default:"-" }}</td>
                     <td style="text-align: center;">
@@ -474,7 +478,7 @@
                   {% endfor %}
                 {% else %}
                   <tr style="text-align: center; color: #82868b;">
-                    <td colspan="6">No movements found</td>
+                    <td colspan="7">No movements found</td>
                   </tr>
                 {% endif %}
               </tbody>
@@ -503,6 +507,10 @@
           <label>Quantity</label>
           <input type="number" name="quantity" class="input-field" placeholder="Enter quantity" min="0" required>
         </div>
+        <div class="form-group">
+          <label>Quantity (kg)</label>
+          <input type="number" name="quantity_kg" class="input-field" placeholder="Enter quantity in kg" min="0" step="0.01" value="0">
+        </div>
         <div class="modal-buttons">
           <button type="button" class="btn btn-secondary" onclick="document.getElementById('addItemModal').classList.remove('active')">Cancel</button>
           <button type="submit" class="btn btn-primary">Add Item</button>
@@ -522,7 +530,7 @@
           <select name="item_id" class="input-field" required>
             <option value="">-- Select an item --</option>
             {% for item in items %}
-              <option value="{{ item.id }}">{{ item.name }} (Qty: {{ item.quantity }})</option>
+              <option value="{{ item.id }}">{{ item.name }} (Qty: {{ item.quantity }}, {{ item.quantity_kg|floatformat:2 }} kg)</option>
             {% endfor %}
           </select>
         </div>
@@ -536,7 +544,11 @@
         </div>
         <div class="form-group">
           <label>Quantity</label>
-          <input type="number" name="quantity" class="input-field" placeholder="Enter quantity" min="1" required>
+          <input type="number" name="quantity" class="input-field" placeholder="Enter quantity" min="0">
+        </div>
+        <div class="form-group">
+          <label>Quantity (kg)</label>
+          <input type="number" name="quantity_kg" class="input-field" placeholder="Enter quantity in kg" min="0" step="0.01" value="0">
         </div>
         <div class="form-group">
           <label>Date</label>
