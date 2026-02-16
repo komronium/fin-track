@@ -403,13 +403,15 @@
                     <tr>
                       <th>Name</th>
                       <th>Position</th>
-                      <th>Balance</th>
+                      <th>UZS Balance</th>
+                      <th>USD Balance</th>
+                      <th>AFN Balance</th>
                       <th style="width: 50px;">Actions</th>
                     </tr>
                   </thead>
                   <tbody id="employeesBody">
                     <tr style="text-align: center; color: #82868b;">
-                      <td colspan="4">Loading employees...</td>
+                      <td colspan="6">Loading employees...</td>
                     </tr>
                   </tbody>
                 </table>
@@ -433,8 +435,21 @@
                 </div>
 
                 <div class="card" style="padding: 20px; background: #f5f3ff; border: 1px solid #ddd6fe; margin-bottom: 24px;">
-                  <div style="font-size: 0.85em; margin-bottom: 8px; font-weight: 500; color: #6d28d9;">Current Balance</div>
-                  <div style="font-size: 2.5em; font-weight: 700; color: #7c3aed;" id="currentBalance">0</div>
+                  <div style="font-size: 0.85em; margin-bottom: 12px; font-weight: 500; color: #6d28d9;">Balance by Currency</div>
+                  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                    <div style="padding: 12px; background: white; border-radius: 6px; text-align: center;">
+                      <div style="font-size: 0.75em; color: #82868b; margin-bottom: 6px;">Uzbek Som</div>
+                      <div style="font-size: 1.5em; font-weight: 700; color: #7c3aed;" id="balanceUzs">0</div>
+                    </div>
+                    <div style="padding: 12px; background: white; border-radius: 6px; text-align: center;">
+                      <div style="font-size: 0.75em; color: #82868b; margin-bottom: 6px;">US Dollar</div>
+                      <div style="font-size: 1.5em; font-weight: 700; color: #7c3aed;" id="balanceUsd">0</div>
+                    </div>
+                    <div style="padding: 12px; background: white; border-radius: 6px; text-align: center;">
+                      <div style="font-size: 0.75em; color: #82868b; margin-bottom: 6px;">Afghan Afghani</div>
+                      <div style="font-size: 1.5em; font-weight: 700; color: #7c3aed;" id="balanceAfn">0</div>
+                    </div>
+                  </div>
                 </div>
 
                 <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
@@ -449,8 +464,10 @@
                       <thead>
                         <tr>
                           <th>Item Name</th>
+                          <th>Unit Type</th>
                           <th>Quantity</th>
                           <th>Price per Unit</th>
+                          <th>Currency</th>
                           <th>Total Earned</th>
                           <th style="text-align: right;">Action</th>
                         </tr>
@@ -473,6 +490,7 @@
                           <th>Date</th>
                           <th>Description</th>
                           <th>Amount</th>
+                          <th>Currency</th>
                           <th style="text-align: right;">Action</th>
                         </tr>
                       </thead>
@@ -532,12 +550,27 @@
         <input type="text" id="itemName" class="input-field" placeholder="e.g., Phone, Laptop, etc.">
       </div>
       <div class="form-group">
+        <label>Unit Type</label>
+        <select id="itemUnit" class="input-field">
+          <option value="dona">Pieces</option>
+          <option value="kg">Kilogram</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Quantity Sold</label>
-        <input type="number" id="itemQuantity" class="input-field" placeholder="Enter quantity" min="1">
+        <input type="number" id="itemQuantity" class="input-field" placeholder="Enter quantity" min="0.01" step="0.01">
       </div>
       <div class="form-group">
         <label>Price per Unit</label>
         <input type="number" id="itemPrice" class="input-field" placeholder="Enter price per unit" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>Currency</label>
+        <select id="itemCurrency" class="input-field">
+          <option value="uzs">Uzbek Som (UZS)</option>
+          <option value="usd">US Dollar (USD)</option>
+          <option value="afn">Afghan Afghani (AFN)</option>
+        </select>
       </div>
       <div style="display: flex; gap: 12px; justify-content: flex-end;">
         <button onclick="closeItemModal()" class="btn btn-secondary">Cancel</button>
@@ -557,6 +590,14 @@
       <div class="form-group">
         <label>Amount</label>
         <input type="number" id="paymentAmount" class="input-field" placeholder="Enter amount to pay" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>Currency</label>
+        <select id="paymentCurrency" class="input-field">
+          <option value="uzs">Uzbek Som (UZS)</option>
+          <option value="usd">US Dollar (USD)</option>
+          <option value="afn">Afghan Afghani (AFN)</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Description (Optional)</label>
@@ -715,13 +756,22 @@
       document.querySelectorAll('.action-menu').forEach(menu => menu.style.display = 'none');
     });
 
+    function formatCurrency(currency) {
+      const currencyMap = {
+        'uzs': '🇺🇿 UZS',
+        'usd': '🇺🇸 USD',
+        'afn': '🇦🇫 AFN'
+      };
+      return currencyMap[currency.toLowerCase()] || currency.toUpperCase();
+    }
+
     function loadEmployees() {
       fetch('/api/employees/')
         .then(response => response.json())
         .then(data => {
           const tbody = document.getElementById('employeesBody');
           if (data.employees.length === 0) {
-            tbody.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="4">No employees yet</td></tr>';
+            tbody.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="6">No employees yet</td></tr>';
             return;
           }
 
@@ -730,7 +780,13 @@
               <td style="font-weight: 500;">${emp.first_name} ${emp.last_name}</td>
               <td>${emp.position || '-'}</td>
               <td>
-                <span style="font-weight: 600; color: #7c3aed;">Loading...</span>
+                <span style="font-weight: 600; color: #16a34a;" id="balance-uzs-${emp.id}">0</span>
+              </td>
+              <td>
+                <span style="font-weight: 600; color: #2563eb;" id="balance-usd-${emp.id}">0</span>
+              </td>
+              <td>
+                <span style="font-weight: 600; color: #d97706;" id="balance-afn-${emp.id}">0</span>
               </td>
               <td style="position: relative; text-align: center;">
                 <button onclick="openEmployeeMenu(event, ${emp.id})" class="btn" style="background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 0;">⋮</button>
@@ -755,25 +811,42 @@
       fetch(`/api/monthly/entries/?employee_id=${employeeId}`)
         .then(response => response.json())
         .then(data => {
-          const rows = document.querySelectorAll('tbody#employeesBody tr');
-          rows.forEach((row) => {
-            // Get employee ID from the row's view button (data attribute or parse from onclick)
-            const viewBtn = row.querySelector('button[onclick*="viewEmployee"]');
-            if (viewBtn) {
-              const btnOnclick = viewBtn.getAttribute('onclick');
-              const rowEmployeeId = parseInt(btnOnclick.match(/\d+/)[0]);
-              
-              // Only update this row if it matches the current employee
-              if (rowEmployeeId === employeeId) {
-                const balanceCell = row.querySelector('td:nth-child(3)');
-                if (data.entries.length > 0) {
-                  balanceCell.innerHTML = `<span style="font-weight: 600; color: #7c3aed;">${parseFloat(data.entries[0].balance).toFixed(2)} sum</span>`;
-                } else {
-                  balanceCell.innerHTML = `<span style="font-weight: 600; color: #7c3aed;">0 sum</span>`;
-                }
-              }
-            }
-          });
+          if (data.entries.length > 0) {
+            // Get latest entry to fetch detailed products and payments
+            const latestEntry = data.entries[0];
+            fetch(`/api/monthly/entry/${latestEntry.id}/`)
+              .then(response => response.json())
+              .then(entryData => {
+                // Calculate balances by currency
+                let balance_uzs = 0, balance_usd = 0, balance_afn = 0;
+                
+                // Add products earnings
+                entryData.products.forEach(product => {
+                  const amount = parseFloat(product.total_amount);
+                  if (product.currency === 'uzs') balance_uzs += amount;
+                  else if (product.currency === 'usd') balance_usd += amount;
+                  else if (product.currency === 'afn') balance_afn += amount;
+                });
+                
+                // Subtract payments
+                entryData.payments.forEach(payment => {
+                  const amount = parseFloat(payment.amount);
+                  if (payment.currency === 'uzs') balance_uzs -= amount;
+                  else if (payment.currency === 'usd') balance_usd -= amount;
+                  else if (payment.currency === 'afn') balance_afn -= amount;
+                });
+                
+                // Update the cells
+                document.getElementById(`balance-uzs-${employeeId}`).textContent = balance_uzs.toFixed(2);
+                document.getElementById(`balance-usd-${employeeId}`).textContent = balance_usd.toFixed(2);
+                document.getElementById(`balance-afn-${employeeId}`).textContent = balance_afn.toFixed(2);
+              });
+          } else {
+            // No entries yet - set all to 0
+            document.getElementById(`balance-uzs-${employeeId}`).textContent = '0.00';
+            document.getElementById(`balance-usd-${employeeId}`).textContent = '0.00';
+            document.getElementById(`balance-afn-${employeeId}`).textContent = '0.00';
+          }
         })
         .catch(error => console.error('Error:', error));
     }
@@ -831,11 +904,12 @@
     }
 
     function updateEmployeeDetail(entry) {
-      document.getElementById('currentBalance').textContent = parseFloat(entry.balance).toFixed(2) + ' sum';
-      
       fetch(`/api/monthly/entry/${entry.id}/`)
         .then(response => response.json())
         .then(data => {
+          document.getElementById('balanceUzs').textContent = parseFloat(data.balance_uzs).toFixed(2);
+          document.getElementById('balanceUsd').textContent = parseFloat(data.balance_usd).toFixed(2);
+          document.getElementById('balanceAfn').textContent = parseFloat(data.balance_afn).toFixed(2);
           updateItemsTable(data.products);
           updatePaymentsTable(data.payments);
         });
@@ -844,15 +918,17 @@
     function updateItemsTable(items) {
       const tbody = document.getElementById('itemsBody');
       if (items.length === 0) {
-        tbody.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="5">No items sold yet</td></tr>';
+        tbody.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="7">No items sold yet</td></tr>';
         return;
       }
 
       tbody.innerHTML = items.map(item => `
         <tr>
           <td>${item.product_name}</td>
-          <td>${item.quantity}</td>
+          <td>${item.unit_type === 'dona' ? 'Pieces' : 'Kilogram'}</td>
+          <td>${parseFloat(item.quantity).toFixed(2)}</td>
           <td>${parseFloat(item.price_per_unit).toFixed(2)}</td>
+          <td><span style="display: inline-block;">${formatCurrency(item.currency)}</span></td>
           <td>${parseFloat(item.total_amount).toFixed(2)}</td>
           <td style="text-align: right;">
             <button onclick="deleteItem(${item.id})" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;">Delete</button>
@@ -864,7 +940,7 @@
     function updatePaymentsTable(payments) {
       const tbody = document.getElementById('paymentsBody');
       if (payments.length === 0) {
-        tbody.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="4">No payments given yet</td></tr>';
+        tbody.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="5">No payments given yet</td></tr>';
         return;
       }
 
@@ -873,6 +949,7 @@
           <td>${new Date(payment.payment_date).toLocaleDateString()}</td>
           <td>${payment.description || '-'}</td>
           <td>${parseFloat(payment.amount).toFixed(2)}</td>
+          <td><span style="display: inline-block;">${formatCurrency(payment.currency)}</span></td>
           <td style="text-align: right;">
             <button onclick="deletePayment(${payment.id})" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;">Delete</button>
           </td>
@@ -978,6 +1055,8 @@
       const itemName = document.getElementById('itemName').value;
       const quantity = document.getElementById('itemQuantity').value;
       const price = document.getElementById('itemPrice').value;
+      const unitType = document.getElementById('itemUnit').value;
+      const currency = document.getElementById('itemCurrency').value;
 
       if (!itemName || !quantity || !price) {
         alert('Please fill in all fields');
@@ -993,15 +1072,16 @@
         body: JSON.stringify({
           entry_id: currentMonthlyEntryId,
           product_name: itemName,
-          quantity: parseInt(quantity),
-          price_per_unit: parseFloat(price)
+          quantity: parseFloat(quantity),
+          price_per_unit: parseFloat(price),
+          unit_type: unitType,
+          currency: currency
         })
       })
       .then(response => response.json())
       .then(data => {
         if (data.success) {
           closeItemModal();
-          document.getElementById('currentBalance').textContent = parseFloat(data.new_balance).toFixed(2) + ' sum';
           viewEmployee(currentEmployeeId);
           loadEmployees();
         } else {
@@ -1028,6 +1108,7 @@
 
     function savePayment() {
       const amount = document.getElementById('paymentAmount').value;
+      const currency = document.getElementById('paymentCurrency').value;
       const description = document.getElementById('paymentDescription').value;
       const paymentDate = document.getElementById('paymentDate').value;
 
@@ -1045,6 +1126,7 @@
         body: JSON.stringify({
           entry_id: currentMonthlyEntryId,
           amount: parseFloat(amount),
+          currency: currency,
           description: description,
           payment_date: paymentDate
         })
@@ -1053,7 +1135,6 @@
       .then(data => {
         if (data.success) {
           closePaymentModal();
-          document.getElementById('currentBalance').textContent = parseFloat(data.new_balance).toFixed(2) + ' sum';
           viewEmployee(currentEmployeeId);
           loadEmployees();
         } else {
@@ -1074,7 +1155,6 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            document.getElementById('currentBalance').textContent = parseFloat(data.new_balance).toFixed(2) + ' sum';
             viewEmployee(currentEmployeeId);
             loadEmployees();
           }
@@ -1094,7 +1174,6 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            document.getElementById('currentBalance').textContent = parseFloat(data.new_balance).toFixed(2) + ' sum';
             viewEmployee(currentEmployeeId);
             loadEmployees();
           }

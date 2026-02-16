@@ -22,9 +22,9 @@ class Transaction(models.Model):
     CURRENCY_USD = "usd"
     CURRENCY_AFN = "afn"
     CURRENCY_CHOICES = [
-        (CURRENCY_UZS, "UZS"),
-        (CURRENCY_USD, "USD"),
-        (CURRENCY_AFN, "AFN"),
+        (CURRENCY_UZS, "Uzbek Som"),
+        (CURRENCY_USD, "US Dollar"),
+        (CURRENCY_AFN, "Afghan Afghani"),
     ]
 
     type = models.CharField(max_length=100, choices=TYPE_CHOICES)
@@ -82,12 +82,30 @@ class MonthlyEntry(models.Model):
 
 
 class MonthlyProduct(models.Model):
+    UNIT_DONA = "dona"
+    UNIT_KG = "kg"
+    UNIT_CHOICES = [
+        (UNIT_DONA, "Pieces"),
+        (UNIT_KG, "Kilogram"),
+    ]
+
+    CURRENCY_UZS = "uzs"
+    CURRENCY_USD = "usd"
+    CURRENCY_AFN = "afn"
+    CURRENCY_CHOICES = [
+        (CURRENCY_UZS, "Uzbek Som"),
+        (CURRENCY_USD, "US Dollar"),
+        (CURRENCY_AFN, "Afghan Afghani"),
+    ]
+
     monthly_entry = models.ForeignKey(
         MonthlyEntry, on_delete=models.CASCADE, related_name="products"
     )
     product_name = models.CharField(max_length=255)
-    quantity = models.PositiveIntegerField()
+    unit_type = models.CharField(max_length=10, choices=UNIT_CHOICES, default=UNIT_DONA)
+    quantity = models.DecimalField(max_digits=12, decimal_places=2)
     price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES, default=CURRENCY_UZS)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -96,14 +114,24 @@ class MonthlyProduct(models.Model):
         ordering = ["monthly_entry", "-created_at"]
 
     def __str__(self):
-        return f"{self.product_name} x{self.quantity}"
+        return f"{self.product_name} x{self.quantity} {self.unit_type} ({self.currency.upper()})"
 
 
 class MonthlyPayment(models.Model):
+    CURRENCY_UZS = "uzs"
+    CURRENCY_USD = "usd"
+    CURRENCY_AFN = "afn"
+    CURRENCY_CHOICES = [
+        (CURRENCY_UZS, "Uzbek Som"),
+        (CURRENCY_USD, "US Dollar"),
+        (CURRENCY_AFN, "Afghan Afghani"),
+    ]
+
     monthly_entry = models.ForeignKey(
         MonthlyEntry, on_delete=models.CASCADE, related_name="payments"
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES, default=CURRENCY_UZS)
     description = models.CharField(max_length=255, blank=True)
     payment_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -113,7 +141,7 @@ class MonthlyPayment(models.Model):
         ordering = ["-payment_date", "-created_at"]
 
     def __str__(self):
-        return f"Payment {self.amount} on {self.payment_date}"
+        return f"Payment {self.amount} {self.currency.upper()} on {self.payment_date}"
 
 
 class WarehouseItem(models.Model):

@@ -1,7 +1,9 @@
-arr = []
-i = 1
+arr = [16, 19, 18, 18, 20, 30, 18]
 
-while True:
-    arr.append([i] * 1000)
-    i += 1
-    print(i)
+juft_arr = []
+
+for i in arr:
+    if i % 2 == 0:
+        juft_arr.append(i)
+
+print(juft_arr)

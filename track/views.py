@@ -647,9 +647,10 @@ class MonthlyEntryDetailAPIView(LoginRequiredMixin, View):
             products = entry.products.all()
             payments = entry.payments.all()
             
-            # Calculate totals
-            products_total = sum(p.total_amount for p in products)
-            payments_total = sum(p.amount for p in payments)
+            # Calculate balances by currency
+            balance_uzs = sum(Decimal(p.total_amount) for p in products if p.currency == 'uzs') - sum(Decimal(p.amount) for p in payments if p.currency == 'uzs')
+            balance_usd = sum(Decimal(p.total_amount) for p in products if p.currency == 'usd') - sum(Decimal(p.amount) for p in payments if p.currency == 'usd')
+            balance_afn = sum(Decimal(p.total_amount) for p in products if p.currency == 'afn') - sum(Decimal(p.amount) for p in payments if p.currency == 'afn')
             
             return JsonResponse({
                 'id': entry.id,
@@ -657,12 +658,17 @@ class MonthlyEntryDetailAPIView(LoginRequiredMixin, View):
                 'employee_name': str(entry.employee),
                 'month': entry.month.isoformat(),
                 'balance': str(entry.balance),
+                'balance_uzs': str(balance_uzs),
+                'balance_usd': str(balance_usd),
+                'balance_afn': str(balance_afn),
                 'products': [
                     {
                         'id': p.id,
                         'product_name': p.product_name,
-                        'quantity': p.quantity,
+                        'quantity': str(p.quantity),
+                        'unit_type': p.unit_type,
                         'price_per_unit': str(p.price_per_unit),
+                        'currency': p.currency,
                         'total_amount': str(p.total_amount),
                     }
                     for p in products
@@ -671,13 +677,12 @@ class MonthlyEntryDetailAPIView(LoginRequiredMixin, View):
                     {
                         'id': p.id,
                         'amount': str(p.amount),
+                        'currency': p.currency,
                         'description': p.description,
                         'payment_date': p.payment_date.isoformat(),
                     }
                     for p in payments
                 ],
-                'products_total': str(products_total),
-                'payments_total': str(payments_total),
             })
         except MonthlyEntry.DoesNotExist:
             return JsonResponse({
@@ -700,8 +705,10 @@ class AddProductAPIView(LoginRequiredMixin, View):
             
             entry_id = int(data.get('entry_id'))
             product_name = data.get('product_name')
-            quantity = int(data.get('quantity'))
+            quantity = Decimal(data.get('quantity'))
             price_per_unit = Decimal(data.get('price_per_unit'))
+            unit_type = data.get('unit_type', 'dona')  # 'dona' or 'kg'
+            currency = data.get('currency', 'uzs')  # 'uzs', 'usd', or 'afn'
             
             entry = MonthlyEntry.objects.get(id=entry_id)
             
@@ -711,7 +718,9 @@ class AddProductAPIView(LoginRequiredMixin, View):
                 monthly_entry=entry,
                 product_name=product_name,
                 quantity=quantity,
+                unit_type=unit_type,
                 price_per_unit=price_per_unit,
+                currency=currency,
                 total_amount=total_amount
             )
             
@@ -775,6 +784,7 @@ class AddPaymentAPIView(LoginRequiredMixin, View):
             
             entry_id = int(data.get('entry_id'))
             amount = Decimal(data.get('amount'))
+            currency = data.get('currency', 'uzs')  # 'uzs', 'usd', or 'afn'
             description = data.get('description', '')
             payment_date = data.get('payment_date')
             
@@ -783,6 +793,7 @@ class AddPaymentAPIView(LoginRequiredMixin, View):
             payment = MonthlyPayment.objects.create(
                 monthly_entry=entry,
                 amount=amount,
+                currency=currency,
                 description=description,
                 payment_date=payment_date
             )
