@@ -305,16 +305,6 @@
               </svg>
               Dashboard
             </a>
-            {% if request.user.is_staff %}
-            <a href="{% url 'users' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-              Users
-            </a>
             <a href="{% url 'monthly' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -331,6 +321,16 @@
                 <line x1="12" y1="22.08" x2="12" y2="12"></line>
               </svg>
               Warehouse
+            </a>
+            {% if request.user.is_staff %}
+            <a href="{% url 'users' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              Users
             </a>
             {% endif %}
           </nav>
@@ -365,7 +365,9 @@
         <div id="items" style="display: block;">
           <div class="section-header">
             <h2 style="font-size: 1.3em; margin: 0; font-weight: 600;">All Items</h2>
+            {% if request.user.is_staff %}
             <button onclick="document.getElementById('addItemModal').classList.add('active')" class="btn btn-primary">+ New Item</button>
+            {% endif %}
           </div>
 
           <div style="overflow-x: auto;">
@@ -388,10 +390,14 @@
                     <td>{{ item.quantity }}</td>
                     <td>{{ item.quantity_kg|floatformat:2 }}</td>
                     <td style="text-align: center;">
+                      {% if request.user.is_staff %}
                       <form method="POST" action="{% url 'api_warehouse_delete_item' item.id %}" style="display: inline;">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;" onclick="return confirm('Delete this item?')">Delete</button>
                       </form>
+                      {% else %}
+                      <span style="color: #82868b; font-size: 0.9em;">Read-only</span>
+                      {% endif %}
                     </td>
                   </tr>
                   {% endfor %}
@@ -409,7 +415,9 @@
         <div id="movements" style="display: none;">
           <div class="section-header">
             <h2 style="font-size: 1.3em; margin: 0; font-weight: 600;">Movement History</h2>
+            {% if request.user.is_staff %}
             <button onclick="document.getElementById('addMovementModal').classList.add('active')" class="btn btn-primary">+ Add Movement</button>
+            {% endif %}
           </div>
 
           <!-- Filters -->
@@ -469,10 +477,14 @@
                     <td>{{ movement.date|date:"Y-m-d" }}</td>
                     <td>{{ movement.description|default:"-" }}</td>
                     <td style="text-align: center;">
+                      {% if request.user.is_staff %}
                       <form method="POST" action="{% url 'api_warehouse_delete_movement' movement.id %}" style="display: inline;">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;" onclick="return confirm('Delete this movement?')">Delete</button>
                       </form>
+                      {% else %}
+                      <span style="color: #82868b; font-size: 0.9em;">Read-only</span>
+                      {% endif %}
                     </td>
                   </tr>
                   {% endfor %}

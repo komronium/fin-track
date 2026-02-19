@@ -462,6 +462,12 @@ class CreateEmployeeAPIView(LoginRequiredMixin, View):
     """API endpoint to create an employee"""
     
     def post(self, request):
+        # Check staff permission
+        if not request.user.is_staff:
+            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
+                return JsonResponse({'error': 'Not authorized'}, status=403)
+            return redirect('monthly')
+        
         try:
             # Check if it's form data or JSON
             if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
@@ -516,6 +522,10 @@ class EmployeeDetailAPIView(LoginRequiredMixin, View):
             }, status=404)
     
     def post(self, request, employee_id):
+        # Check staff permission
+        if not request.user.is_staff:
+            return JsonResponse({'error': 'Not authorized'}, status=403)
+        
         try:
             data = json.loads(request.body)
             employee = Employee.objects.get(id=employee_id)
@@ -601,6 +611,10 @@ class CreateMonthlyEntryAPIView(LoginRequiredMixin, View):
     """API endpoint to create a monthly entry"""
     
     def post(self, request):
+        # Check staff permission
+        if not request.user.is_staff:
+            return JsonResponse({'error': 'Not authorized'}, status=403)
+        
         try:
             data = json.loads(request.body)
             
@@ -695,6 +709,12 @@ class AddProductAPIView(LoginRequiredMixin, View):
     """API endpoint to add a product to monthly entry"""
     
     def post(self, request):
+        # Check staff permission
+        if not request.user.is_staff:
+            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
+                return JsonResponse({'error': 'Not authorized'}, status=403)
+            return redirect('monthly')
+        
         try:
             # Check if it's form data or JSON
             if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
@@ -749,6 +769,10 @@ class DeleteProductAPIView(LoginRequiredMixin, View):
     """API endpoint to delete a product"""
     
     def post(self, request, product_id):
+        # Check staff permission
+        if not request.user.is_staff:
+            return JsonResponse({'error': 'Not authorized'}, status=403)
+        
         try:
             product = MonthlyProduct.objects.get(id=product_id)
             entry = product.monthly_entry
@@ -779,6 +803,10 @@ class AddPaymentAPIView(LoginRequiredMixin, View):
     """API endpoint to add a payment (deduct from balance)"""
     
     def post(self, request):
+        # Check staff permission
+        if not request.user.is_staff:
+            return JsonResponse({'error': 'Not authorized'}, status=403)
+        
         try:
             data = json.loads(request.body)
             
@@ -819,6 +847,10 @@ class DeletePaymentAPIView(LoginRequiredMixin, View):
     """API endpoint to delete a payment"""
     
     def post(self, request, payment_id):
+        # Check staff permission
+        if not request.user.is_staff:
+            return JsonResponse({'error': 'Not authorized'}, status=403)
+        
         try:
             payment = MonthlyPayment.objects.get(id=payment_id)
             entry = payment.monthly_entry
@@ -844,12 +876,9 @@ class DeletePaymentAPIView(LoginRequiredMixin, View):
             }, status=400)
 
 
-class WarehouseView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+class WarehouseView(LoginRequiredMixin, TemplateView):
     """View for warehouse inventory management"""
     template_name = 'warehouse.html'
-    
-    def test_func(self):
-        return self.request.user.is_staff
     
     def get_context_data(self, **kwargs):
         items = WarehouseItem.objects.all()

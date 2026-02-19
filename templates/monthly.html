@@ -334,16 +334,6 @@
               </svg>
               Dashboard
             </a>
-            {% if request.user.is_staff %}
-            <a href="{% url 'users' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-              Users
-            </a>
             <a href="{% url 'monthly' %}" class="btn" style="background: #7367f0; color: white; text-decoration: none; display: flex; align-items: center; gap: 6px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -360,6 +350,16 @@
                 <line x1="12" y1="22.08" x2="12" y2="12"></line>
               </svg>
               Warehouse
+            </a>
+            {% if request.user.is_staff %}
+            <a href="{% url 'users' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              Users
             </a>
             {% endif %}
           </nav>
@@ -453,8 +453,10 @@
                 </div>
 
                 <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+                  {% if request.user.is_staff %}
                   <button onclick="openItemModal()" class="btn btn-success">+ Add Item Sold</button>
                   <button onclick="openPaymentModal()" class="btn btn-primary">+ Give Payment</button>
+                  {% endif %}
                 </div>
 
                 <div style="margin-bottom: 32px;">
@@ -636,6 +638,7 @@
   <script>
     let currentEmployeeId = null;
     let currentMonthlyEntryId = null;
+    let userIsStaff = {{ request.user.is_staff|lower }};
 
     document.addEventListener('DOMContentLoaded', function() {
       const today = new Date();
@@ -931,7 +934,7 @@
           <td><span style="display: inline-block;">${formatCurrency(item.currency)}</span></td>
           <td>${parseFloat(item.total_amount).toFixed(2)}</td>
           <td style="text-align: right;">
-            <button onclick="deleteItem(${item.id})" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;">Delete</button>
+            ${userIsStaff ? `<button onclick="deleteItem(${item.id})" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;">Delete</button>` : '<span style="color: #82868b; font-size: 0.9em;">Read-only</span>'}
           </td>
         </tr>
       `).join('');
@@ -951,7 +954,7 @@
           <td>${parseFloat(payment.amount).toFixed(2)}</td>
           <td><span style="display: inline-block;">${formatCurrency(payment.currency)}</span></td>
           <td style="text-align: right;">
-            <button onclick="deletePayment(${payment.id})" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;">Delete</button>
+            ${userIsStaff ? `<button onclick="deletePayment(${payment.id})" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;">Delete</button>` : '<span style="color: #82868b; font-size: 0.9em;">Read-only</span>'}
           </td>
         </tr>
       `).join('');
