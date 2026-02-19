@@ -386,16 +386,24 @@
 
           <div class="card" style="padding: 24px;">
             <div class="tabs">
-              <button class="tab-btn active" onclick="switchTab('list')">Employees</button>
+              <button class="tab-btn {% if not request.user.is_staff %}none-tab{% endif %} active" onclick="switchTab('list')" style="{% if not request.user.is_staff %}display: none;{% endif %}">Employees</button>
               <button class="tab-btn" onclick="switchTab('details')">Details</button>
             </div>
 
             <!-- Tab: Employees List -->
+            {% if request.user.is_staff %}
             <div id="list" class="tab-content active">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
                 <h2 style="font-size: 1.3em; margin: 0; font-weight: 600; color: #5e5873;">All Employees</h2>
                 <button onclick="openEmployeeModal()" class="btn btn-primary">+ Add Employee</button>
               </div>
+            {% else %}
+            <div id="list" class="tab-content active" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
+                <h2 style="font-size: 1.3em; margin: 0; font-weight: 600; color: #5e5873;">All Employees</h2>
+                <button onclick="openEmployeeModal()" class="btn btn-primary" style="display: none;">+ Add Employee</button>
+              </div>
+            {% endif %}
 
               <div style="overflow-x: auto;">
                 <table class="table">
@@ -417,6 +425,7 @@
                 </table>
               </div>
             </div>
+            {% endif %}
 
             <!-- Tab: Employee Details -->
             <div id="details" class="tab-content">
@@ -770,8 +779,21 @@
 
     function loadEmployees() {
       fetch('/api/employees/')
-        .then(response => response.json())
+        .then(response => {
+          if (!response.ok) {
+            if (response.status === 403) {
+              // Read-only user, cannot view employees
+              const tbody = document.getElementById('employeesBody');
+              tbody.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="6">Access denied</td></tr>';
+              return {};
+            }
+            throw new Error('Error loading employees');
+          }
+          return response.json();
+        })
         .then(data => {
+          if (!data.employees) return;
+          
           const tbody = document.getElementById('employeesBody');
           if (data.employees.length === 0) {
             tbody.innerHTML = '<tr style="text-align: center; color: #82868b;"><td colspan="6">No employees yet</td></tr>';
@@ -812,14 +834,27 @@
 
     function loadEmployeeBalance(employeeId) {
       fetch(`/api/monthly/entries/?employee_id=${employeeId}`)
-        .then(response => response.json())
+        .then(response => {
+          if (!response.ok) {
+            // Access denied or error
+            return {};
+          }
+          return response.json();
+        })
         .then(data => {
-          if (data.entries.length > 0) {
-            // Get latest entry to fetch detailed products and payments
-            const latestEntry = data.entries[0];
-            fetch(`/api/monthly/entry/${latestEntry.id}/`)
-              .then(response => response.json())
-              .then(entryData => {
+          if (!data.entries || data.entries.length === 0) return;
+          
+          // Get latest entry to fetch detailed products and payments
+          const latestEntry = data.entries[0];
+          fetch(`/api/monthly/entry/${latestEntry.id}/`)
+            .then(response => {
+              if (!response.ok) {
+                return {};
+              }
+              return response.json();
+            })
+            .then(entryData => {
+              if (entryData.id) {
                 // Calculate balances by currency
                 let balance_uzs = 0, balance_usd = 0, balance_afn = 0;
                 
@@ -843,13 +878,9 @@
                 document.getElementById(`balance-uzs-${employeeId}`).textContent = balance_uzs.toFixed(2);
                 document.getElementById(`balance-usd-${employeeId}`).textContent = balance_usd.toFixed(2);
                 document.getElementById(`balance-afn-${employeeId}`).textContent = balance_afn.toFixed(2);
-              });
-          } else {
-            // No entries yet - set all to 0
-            document.getElementById(`balance-uzs-${employeeId}`).textContent = '0.00';
-            document.getElementById(`balance-usd-${employeeId}`).textContent = '0.00';
-            document.getElementById(`balance-afn-${employeeId}`).textContent = '0.00';
-          }
+              }
+            })
+            .catch(error => console.error('Error:', error));
         })
         .catch(error => console.error('Error:', error));
     }

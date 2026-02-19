@@ -418,6 +418,12 @@ class MonthlyView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         from django.utils import timezone
         
+        # Only staff users can view employee data
+        if not self.request.user.is_staff:
+            kwargs['employees'] = []
+            kwargs['monthly_entries'] = {}
+            return super().get_context_data(**kwargs)
+        
         employees = Employee.objects.filter(is_active=True)
         kwargs['employees'] = employees
         
@@ -441,6 +447,10 @@ class EmployeeListAPIView(LoginRequiredMixin, View):
     """API endpoint to list employees"""
     
     def get(self, request):
+        # Only staff users can view employee list
+        if not request.user.is_staff:
+            return JsonResponse({'error': 'Not authorized'}, status=403)
+        
         employees = Employee.objects.all()
         data = {
             'employees': [
@@ -505,6 +515,10 @@ class EmployeeDetailAPIView(LoginRequiredMixin, View):
     """API endpoint to get, update, or delete an employee"""
     
     def get(self, request, employee_id):
+        # Only staff users can view employee details
+        if not request.user.is_staff:
+            return JsonResponse({'error': 'Not authorized'}, status=403)
+        
         try:
             employee = Employee.objects.get(id=employee_id)
             return JsonResponse({
@@ -585,6 +599,10 @@ class MonthlyEntryListAPIView(LoginRequiredMixin, View):
     """API endpoint to list monthly entries"""
     
     def get(self, request):
+        # Only staff users can view monthly entries (which contain employee data)
+        if not request.user.is_staff:
+            return JsonResponse({'error': 'Not authorized'}, status=403)
+        
         employee_id = request.GET.get('employee_id')
         
         entries = MonthlyEntry.objects.all()
@@ -651,10 +669,15 @@ class CreateMonthlyEntryAPIView(LoginRequiredMixin, View):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(csrf_exempt, name='dispatch')
 class MonthlyEntryDetailAPIView(LoginRequiredMixin, View):
     """API endpoint to get monthly entry details with products and payments"""
     
     def get(self, request, entry_id):
+        # Only staff users can view monthly entries
+        if not request.user.is_staff:
+            return JsonResponse({'error': 'Not authorized'}, status=403)
+        
         try:
             entry = MonthlyEntry.objects.get(id=entry_id)
             
