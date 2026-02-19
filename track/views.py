@@ -447,10 +447,7 @@ class EmployeeListAPIView(LoginRequiredMixin, View):
     """API endpoint to list employees"""
     
     def get(self, request):
-        # Only staff users can view employee list
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
+        # All logged-in users can view employee list
         employees = Employee.objects.all()
         data = {
             'employees': [
@@ -515,10 +512,7 @@ class EmployeeDetailAPIView(LoginRequiredMixin, View):
     """API endpoint to get, update, or delete an employee"""
     
     def get(self, request, employee_id):
-        # Only staff users can view employee details
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
+        # All logged-in users can view employee details
         try:
             employee = Employee.objects.get(id=employee_id)
             return JsonResponse({
