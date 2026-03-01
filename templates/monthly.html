@@ -898,7 +898,7 @@
         .then(data => {
           if (data.entries.length > 0) {
             currentMonthlyEntryId = data.entries[0].id;
-            updateEmployeeDetail(data.entries[0]);
+            updateEmployeeDetail(data.entries);
           } else {
             // Create entry if doesn't exist
             const today = new Date();
@@ -933,18 +933,43 @@
       document.querySelectorAll('.tab-btn')[0].classList.remove('active');
     }
 
-    function updateEmployeeDetail(entry) {
-      fetch(`/api/monthly/entry/${entry.id}/`)
-        .then(response => response.json())
-        .then(data => {
-          document.getElementById('balanceUzs').textContent = parseFloat(data.balance_uzs).toFixed(2);
-          document.getElementById('balanceUsd').textContent = parseFloat(data.balance_usd).toFixed(2);
-          document.getElementById('balanceAfn').textContent = parseFloat(data.balance_afn).toFixed(2);
-          updateItemsTable(data.products);
-          updatePaymentsTable(data.payments);
-        });
-    }
+    function updateEmployeeDetail(entries) {
+  // Barcha oylarning ma'lumotlarini olish uchun fetch so'rovlari massivini yaratamiz
+  const requests = entries.map(entry => 
+    fetch(`/api/monthly/entry/${entry.id}/`).then(res => res.json())
+  );
 
+  // Barcha oylar bo'yicha ma'lumotlar kelishini kutamiz
+  Promise.all(requests)
+    .then(allMonthsData => {
+      let total_uzs = 0, total_usd = 0, total_afn = 0;
+      let allProducts = [];
+      let allPayments = [];
+
+      allMonthsData.forEach(data => {
+        if (data.id) {
+          // Har bir oyning balansini umumiy balansga qo'shamiz
+          total_uzs += parseFloat(data.balance_uzs || 0);
+          total_usd += parseFloat(data.balance_usd || 0);
+          total_afn += parseFloat(data.balance_afn || 0);
+          
+          // Mahsulotlar va to'lovlar ro'yxatini bitta umumiy ro'yxatga yig'amiz
+          if (data.products) allProducts = allProducts.concat(data.products);
+          if (data.payments) allPayments = allPayments.concat(data.payments);
+        }
+      });
+
+      // UI (ekran) dagi elementlarni yangilaymiz
+      document.getElementById('balanceUzs').textContent = total_uzs.toFixed(2);
+      document.getElementById('balanceUsd').textContent = total_usd.toFixed(2);
+      document.getElementById('balanceAfn').textContent = total_afn.toFixed(2);
+      
+      // Jadvallarga barcha oylarning yig'ilgan ma'lumotlarini beramiz
+      updateItemsTable(allProducts);
+      updatePaymentsTable(allPayments);
+    })
+    .catch(error => console.error('Xatolik yuz berdi:', error));
+}
     function updateItemsTable(items) {
       const tbody = document.getElementById('itemsBody');
       if (items.length === 0) {
