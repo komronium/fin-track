@@ -831,58 +831,56 @@
     }
 
     function loadEmployeeBalance(employeeId) {
-      fetch(`/api/monthly/entries/?employee_id=${employeeId}`)
-        .then(response => {
-          if (!response.ok) {
-            // Access denied or error
-            return {};
-          }
-          return response.json();
-        })
-        .then(data => {
-          if (!data.entries || data.entries.length === 0) return;
-          
-          // Get latest entry to fetch detailed products and payments
-          const latestEntry = data.entries[0];
-          fetch(`/api/monthly/entry/${latestEntry.id}/`)
-            .then(response => {
-              if (!response.ok) {
-                return {};
-              }
-              return response.json();
-            })
-            .then(entryData => {
-              if (entryData.id) {
-                // Calculate balances by currency
-                let balance_uzs = 0, balance_usd = 0, balance_afn = 0;
-                
-                // Add products earnings
-                entryData.products.forEach(product => {
-                  const amount = parseFloat(product.total_amount);
-                  if (product.currency === 'uzs') balance_uzs += amount;
-                  else if (product.currency === 'usd') balance_usd += amount;
-                  else if (product.currency === 'afn') balance_afn += amount;
-                });
-                
-                // Subtract payments
-                entryData.payments.forEach(payment => {
-                  const amount = parseFloat(payment.amount);
-                  if (payment.currency === 'uzs') balance_uzs -= amount;
-                  else if (payment.currency === 'usd') balance_usd -= amount;
-                  else if (payment.currency === 'afn') balance_afn -= amount;
-                });
-                
-                // Update the cells
-                document.getElementById(`balance-uzs-${employeeId}`).textContent = balance_uzs.toFixed(2);
-                document.getElementById(`balance-usd-${employeeId}`).textContent = balance_usd.toFixed(2);
-                document.getElementById(`balance-afn-${employeeId}`).textContent = balance_afn.toFixed(2);
-              }
-            })
-            .catch(error => console.error('Error:', error));
-        })
-        .catch(error => console.error('Error:', error));
-    }
+  fetch(`/api/monthly/entries/?employee_id=${employeeId}`)
+    .then(response => response.ok ? response.json() : { entries: [] })
+    .then(data => {
+      if (!data.entries || data.entries.length === 0) return;
 
+      // Barcha oylarning detallarini olish uchun so'rovlar massivini tayyorlaymiz
+      const detailRequests = data.entries.map(entry => 
+        fetch(`/api/monthly/entry/${entry.id}/`).then(res => res.json())
+      );
+
+      // Barcha so'rovlar tugashini kutamiz
+      Promise.all(detailRequests)
+        .then(allEntriesData => {
+          let total_balance_uzs = 0;
+          let total_balance_usd = 0;
+          let total_balance_afn = 0;
+
+          allEntriesData.forEach(entryData => {
+            if (entryData.id) {
+              // Har bir oyning mahsulotlarini hisoblash
+              entryData.products.forEach(product => {
+                const amount = parseFloat(product.total_amount);
+                if (product.currency === 'uzs') total_balance_uzs += amount;
+                else if (product.currency === 'usd') total_balance_usd += amount;
+                else if (product.currency === 'afn') total_balance_afn += amount;
+              });
+
+              // Har bir oyning to'lovlarini ayirish
+              entryData.payments.forEach(payment => {
+                const amount = parseFloat(payment.amount);
+                if (payment.currency === 'uzs') total_balance_uzs -= amount;
+                else if (payment.currency === 'usd') total_balance_usd -= amount;
+                else if (payment.currency === 'afn') total_balance_afn -= amount;
+              });
+            }
+          });
+
+          // UI ni yangilash (Umumiy balans bilan)
+          const uzsEl = document.getElementById(`balance-uzs-${employeeId}`);
+          const usdEl = document.getElementById(`balance-usd-${employeeId}`);
+          const afnEl = document.getElementById(`balance-afn-${employeeId}`);
+
+          if (uzsEl) uzsEl.textContent = total_balance_uzs.toFixed(2);
+          if (usdEl) usdEl.textContent = total_balance_usd.toFixed(2);
+          if (afnEl) afnEl.textContent = total_balance_afn.toFixed(2);
+        })
+        .catch(error => console.error('Error fetching entry details:', error));
+    })
+    .catch(error => console.error('Error fetching entries list:', error));
+}
     function viewEmployee(employeeId) {
       currentEmployeeId = employeeId;
       
