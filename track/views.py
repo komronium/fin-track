@@ -37,6 +37,7 @@ MAX_STOCK_QTY = 2_000_000_000
 
 TRANSACTION_PAGE_SIZE = 200      # rows rendered / returned by default
 MAX_TRANSACTION_LIMIT = 1000
+WAREHOUSE_MOVEMENT_PAGE_SIZE = 200  # rows of history rendered before "Show all"
 DEFAULT_DASHBOARD_DAYS = 5      # the dashboard opens on the last N days
 
 
@@ -798,9 +799,19 @@ class WarehouseView(LoginRequiredMixin, TemplateView):
         if movement_type in MOVEMENT_TYPES:
             filtered = filtered.filter(type=movement_type)
 
+        total = filtered.count()
+        capped = total > WAREHOUSE_MOVEMENT_PAGE_SIZE and self.request.GET.get('all') != '1'
+        if capped:
+            filtered = filtered[:WAREHOUSE_MOVEMENT_PAGE_SIZE]
+        show_all = self.request.GET.copy()
+        show_all['all'] = '1'
+
         kwargs['items'] = WarehouseItem.objects.all()
-        kwargs['movements'] = movements
         kwargs['filtered_movements'] = filtered
+        kwargs['movements_total'] = total
+        kwargs['movements_capped'] = capped
+        kwargs['movements_shown'] = WAREHOUSE_MOVEMENT_PAGE_SIZE
+        kwargs['show_all_query'] = show_all.urlencode()
         return super().get_context_data(**kwargs)
 
 

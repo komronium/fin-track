@@ -466,6 +466,9 @@
                 {% endif %}
               </tbody>
             </table>
+            {% if movements_capped %}
+            <p style="margin: 12px 0 0; color: #6e6b7b; font-size: 0.9em;">Showing the latest {{ movements_shown }} of {{ movements_total }} movements. <a href="?{{ show_all_query }}" style="color: #7367f0;">Show all</a></p>
+            {% endif %}
           </div>
         </div>
       </div>

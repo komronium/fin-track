@@ -615,3 +615,79 @@ class SessionExpiryTests(AuthTestCase):
     def test_pages_install_the_session_handler(self):
         html = self.as_user(self.staff).get("/").content.decode()
         self.assertIn("X-Session-Expired", html)
+
+
+from django.core.cache import cache
+from django.test import override_settings
+
+LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "login-throttle-tests"}}
+
+
+@override_settings(CACHES=LOCMEM)
+class LoginThrottleTests(AuthTestCase):
+    def setUp(self):
+        cache.clear()
+
+    def attempt(self, username="plain", password="wrong", client=None):
+        return (client or self.client).post("/login/", {"username": username, "password": password})
+
+    def test_below_the_limit_shows_the_normal_error(self):
+        for _ in range(4):
+            resp = self.attempt()
+        self.assertContains(resp, "Invalid username or password")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_too_many_failures_block_even_the_right_password(self):
+        for _ in range(5):
+            self.attempt()
+        resp = self.attempt(password="pw-plain-123")
+        self.assertEqual(resp.status_code, 429)
+        self.assertContains(resp, "Too many sign-in attempts", status_code=429)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_other_usernames_are_not_affected(self):
+        for _ in range(5):
+            self.attempt()
+        resp = self.attempt(username="staff", password="pw-staff-123")
+        self.assertEqual(resp.status_code, 302)
+
+    def test_a_good_sign_in_resets_the_counter(self):
+        for _ in range(3):
+            self.attempt()
+        self.assertEqual(self.attempt(password="pw-plain-123").status_code, 302)
+        self.client.logout()
+        for _ in range(3):
+            self.attempt()
+        self.assertEqual(self.attempt().status_code, 200)
+
+    def test_username_case_does_not_dodge_the_limit(self):
+        for name in ("plain", "PLAIN", "Plain", "pLAIN", "plain"):
+            self.attempt(username=name)
+        self.assertEqual(self.attempt(username="plain", password="pw-plain-123").status_code, 429)
+
+
+class WarehouseMovementCapTests(StaffTestCase):
+    def setUp(self):
+        super().setUp()
+        self.item = WarehouseItem.objects.create(name="Flour")
+        for n in range(5):
+            self.post("/api/warehouse/entry/add/", {"item_id": self.item.id, "type": "in", "quantity": 1,
+                                                    "date": "2026-10-01", "description": f"m{n}"})
+
+    def rows(self, html):
+        return html.split('id="movements"')[1].count("api/warehouse/entry/") 
+
+    def test_long_history_is_capped_with_a_show_all_link(self):
+        from unittest import mock
+        from track import views
+        with mock.patch.object(views, "WAREHOUSE_MOVEMENT_PAGE_SIZE", 3):
+            page = self.client.get("/warehouse/")
+            full = self.client.get("/warehouse/?all=1")
+        self.assertContains(page, "Showing the latest 3 of 5 movements.")
+        self.assertContains(page, 'href="?all=1"')
+        self.assertEqual(self.rows(page.content.decode()), 3 + 1)   # 3 rows + the add-movement form action
+        self.assertNotContains(full, "Showing the latest")
+        self.assertEqual(self.rows(full.content.decode()), 5 + 1)
+
+    def test_short_history_has_no_note(self):
+        self.assertNotContains(self.client.get("/warehouse/"), "Showing the latest")

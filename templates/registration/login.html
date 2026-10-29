@@ -103,7 +103,9 @@
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next }}">
 
-        {% if form.errors %}
+        {% if throttled %}
+        <p class="error" role="alert">Too many sign-in attempts. Please wait 15 minutes and try again.</p>
+        {% elif form.errors %}
         <p class="error" role="alert">❌ Invalid username or password</p>
         {% endif %}
 

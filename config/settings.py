@@ -1,4 +1,5 @@
 import os
+import tempfile
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -178,3 +179,14 @@ LOGGING = {
     'handlers': {'console': {'class': 'logging.StreamHandler'}},
     'root': {'handlers': ['console'], 'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO')},
 }
+
+# Shared by all worker processes; used for the sign-in attempt limiter.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': os.environ.get('DJANGO_CACHE_DIR', os.path.join(tempfile.gettempdir(), 'fin-track-cache')),
+    }
+}
+
+# X-Real-IP (set by nginx) identifies the visitor only when we really are behind that proxy.
+TRUST_PROXY_HEADERS = _env_bool('DJANGO_BEHIND_PROXY')
