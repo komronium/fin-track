@@ -758,3 +758,12 @@ class ReadabilityTests(StaffTestCase):
         self.assertIn("function formatAmount", html)
         self.assertIn("unicode-bidi: plaintext", html)
         self.assertNotIn(".toFixed(2)", html)
+
+
+class RoleLabelTests(StaffTestCase):
+    def test_roles_say_what_they_allow_on_the_users_page(self):
+        html = self.client.get("/users/").content.decode()
+        self.assertIn("Staff · can edit", html)
+        self.assertIn("User · view only", html)
+        self.assertIn("User (view only)</option>", html)
+        self.assertIn("Staff (can edit)</option>", html)

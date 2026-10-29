@@ -358,9 +358,9 @@
                       </td>
                       <td>
                         {% if user.is_staff %}
-                          <span class="badge" style="background: #fff3e0; color: #ff9f43;">Staff</span>
+                          <span class="badge" style="background: #fff3e0; color: #ff9f43;" title="Can add, change and delete data">Staff · can edit</span>
                         {% else %}
-                          <span class="badge" style="background: #f0f0f0; color: #666;">User</span>
+                          <span class="badge" style="background: #f0f0f0; color: #666;" title="Can look at data but not change it">User · view only</span>
                         {% endif %}
                       </td>
                       <td style="text-align: right;">
@@ -451,8 +451,8 @@
           <div>
             <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;" for="isStaff">Role</label>
             <select id="isStaff" class="input-field">
-              <option value="false">User</option>
-              <option value="true">Staff</option>
+              <option value="false">User (view only)</option>
+              <option value="true">Staff (can edit)</option>
             </select>
           </div>
         </div>
@@ -630,8 +630,8 @@
           : '<span class="badge badge-danger">Inactive</span>';
 
         const roleBadge = user.is_staff 
-          ? '<span class="badge" style="background: #fff3e0; color: #ff9f43;">Staff</span>'
-          : '<span class="badge" style="background: #f0f0f0; color: #666;">User</span>';
+          ? '<span class="badge" style="background: #fff3e0; color: #ff9f43;" title="Can add, change and delete data">Staff · can edit</span>'
+          : '<span class="badge" style="background: #f0f0f0; color: #666;" title="Can look at data but not change it">User · view only</span>';
 
         let actionsHTML = '';
         if (isStaff) {
