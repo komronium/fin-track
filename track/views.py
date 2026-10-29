@@ -1,449 +1,537 @@
-from django.views.generic import TemplateView, View
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+import json
+import logging
+from datetime import datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
-from django.db.models import Sum, Q
-from django.db.models.functions import Coalesce
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
+from django.db import IntegrityError, transaction as db_transaction
+from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import redirect
-from django.views.decorators.http import require_http_methods
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-import json
-from datetime import datetime
-from decimal import Decimal
+from django.utils import timezone
+from django.views.generic import TemplateView, View
 
-from track.models import Transaction, PaymentMethod, Employee, MonthlyEntry, MonthlyProduct, MonthlyPayment, WarehouseItem, WarehouseMovement
+from track.models import (
+    Employee, MonthlyEntry, MonthlyPayment, MonthlyProduct, PaymentMethod,
+    Transaction, WarehouseItem, WarehouseMovement,
+)
+
+logger = logging.getLogger(__name__)
+
+CURRENCIES = ('uzs', 'usd', 'afn')
+UNIT_TYPES = (MonthlyProduct.UNIT_DONA, MonthlyProduct.UNIT_KG)
+TRANSACTION_TYPES = (Transaction.TYPE_INCOME, Transaction.TYPE_EXPENSE)
+MOVEMENT_TYPES = (WarehouseMovement.IN, WarehouseMovement.OUT)
+
+MONEY_STEP = Decimal('0.01')
+MAX_AMOUNT = Decimal('999999999999.99')   # Transaction.amount: 14 digits, 2 decimals
+MAX_TOTAL = Decimal('9999999999.99')      # monthly products / payments: 12 digits, 2 decimals
+MAX_UNIT_PRICE = Decimal('99999999.99')   # MonthlyProduct.price_per_unit: 10 digits, 2 decimals
+MAX_STOCK_KG = Decimal('9999999999.99')
+MAX_STOCK_QTY = 2_000_000_000
+
+TRANSACTION_PAGE_SIZE = 200      # rows rendered / returned by default
+MAX_TRANSACTION_LIMIT = 1000
+
+
+# --------------------------------------------------------------------------- #
+# Errors and input parsing
+# --------------------------------------------------------------------------- #
+
+class APIError(Exception):
+    """A problem with the request that should be reported to the user as-is."""
+
+    def __init__(self, message, status=400):
+        super().__init__(message)
+        self.message = message
+        self.status = status
+
+
+def error_response(message, status=400):
+    return JsonResponse({'success': False, 'error': message}, status=status)
+
+
+def wants_json(request):
+    return 'application/json' in request.META.get('CONTENT_TYPE', '')
+
+
+def load_json(request):
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, UnicodeDecodeError):
+        raise APIError('Invalid JSON body.')
+    if not isinstance(data, dict):
+        raise APIError('Invalid JSON body.')
+    return data
+
+
+def load_data(request):
+    """JSON body for fetch() callers, form fields for classic form posts."""
+    if wants_json(request):
+        return load_json(request)
+    return request.POST.dict()
+
+
+def blank(value):
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def parse_text(value, field, max_len, required=False):
+    if blank(value):
+        if required:
+            raise APIError(f'{field} is required.')
+        return ''
+    if isinstance(value, (dict, list, bool)):
+        raise APIError(f'{field} is not valid.')
+    text = str(value).strip()
+    if len(text) > max_len:
+        raise APIError(f'{field} must be at most {max_len} characters.')
+    return text
+
+
+def parse_choice(value, choices, field):
+    if value not in choices:
+        raise APIError(f'{field} must be one of: {", ".join(choices)}.')
+    return value
+
+
+def parse_int(value, field, minimum=None, maximum=None, default=None):
+    if blank(value):
+        if default is not None:
+            return default
+        raise APIError(f'{field} is required.')
+    if isinstance(value, bool):
+        raise APIError(f'{field} must be a whole number.')
+    try:
+        number = Decimal(str(value).strip())
+    except InvalidOperation:
+        raise APIError(f'{field} must be a whole number.')
+    if not number.is_finite() or number != number.to_integral_value():
+        raise APIError(f'{field} must be a whole number.')
+    number = int(number)
+    if minimum is not None and number < minimum:
+        raise APIError(f'{field} must be at least {minimum}.')
+    if maximum is not None and number > maximum:
+        raise APIError(f'{field} is too large.')
+    return number
+
+
+def parse_decimal(value, field, minimum=MONEY_STEP, maximum=MAX_AMOUNT, default=None):
+    if blank(value):
+        if default is not None:
+            return default
+        raise APIError(f'{field} is required.')
+    if isinstance(value, (bool, dict, list)):
+        raise APIError(f'{field} must be a number.')
+    try:
+        number = Decimal(str(value).strip())
+    except InvalidOperation:
+        raise APIError(f'{field} must be a number.')
+    if not number.is_finite():
+        raise APIError(f'{field} must be a number.')
+    if abs(number) > maximum * 10:
+        raise APIError(f'{field} is too large.')
+    number = number.quantize(MONEY_STEP, rounding=ROUND_HALF_UP)
+    if number < minimum:
+        raise APIError(f'{field} must be at least {minimum}.')
+    if number > maximum:
+        raise APIError(f'{field} is too large.')
+    return number
+
+
+def parse_date(value, field, allow_future=False):
+    if blank(value):
+        raise APIError(f'{field} is required.')
+    try:
+        parsed = datetime.strptime(str(value).strip(), '%Y-%m-%d').date()
+    except ValueError:
+        raise APIError(f'{field} must be a valid date (YYYY-MM-DD).')
+    if not allow_future and parsed > timezone.localdate() + timedelta(days=1):
+        raise APIError(f'{field} cannot be in the future.')
+    return parsed
+
+
+def parse_bool(value, field, default=True):
+    if value is None or value == '':
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in ('1', 'true', 'on', 'yes'):
+        return True
+    if text in ('0', 'false', 'off', 'no'):
+        return False
+    raise APIError(f'{field} must be true or false.')
+
+
+def parse_email(value):
+    email = parse_text(value, 'Email', 254)
+    if email:
+        try:
+            validate_email(email)
+        except DjangoValidationError:
+            raise APIError('Enter a valid email address.')
+    return email
+
+
+def get_or_404(source, pk, label):
+    """`source` is a model class or a queryset (e.g. with select_related / select_for_update)."""
+    queryset = source._default_manager.all() if isinstance(source, type) else source
+    try:
+        return queryset.get(pk=pk)
+    except queryset.model.DoesNotExist:
+        raise APIError(f'{label} not found.', status=404)
+
+
+def num(value):
+    """Decimal -> int when whole, else float, so JSON stays a plain number."""
+    value = Decimal(value)
+    return int(value) if value == value.to_integral_value() else float(value)
+
+
+def money_str(value):
+    return str(Decimal(value).quantize(MONEY_STEP))
+
+
+def current_month_start():
+    return timezone.localdate().replace(day=1)
+
+
+# --------------------------------------------------------------------------- #
+# Base class for JSON endpoints
+# --------------------------------------------------------------------------- #
+
+class ApiView(View):
+    """Login required; selected methods staff-only; APIError -> JSON; surprises are logged, not leaked."""
+
+    staff_methods = ('POST',)
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return error_response('Authentication required.', status=401)
+        try:
+            if request.method in self.staff_methods and not request.user.is_staff:
+                raise APIError('Permission denied. Only staff users can perform this action.', status=403)
+            return super().dispatch(request, *args, **kwargs)
+        except APIError as exc:
+            return self.handle_api_error(request, exc)
+        except Exception:
+            logger.exception('Unhandled error in %s', self.__class__.__name__)
+            return self.handle_api_error(request, APIError('Something went wrong. Please try again.', status=500))
+
+    def handle_api_error(self, request, exc):
+        return error_response(exc.message, status=exc.status)
+
+
+class FormOrApiView(ApiView):
+    """Endpoints used both by fetch() and by plain HTML forms (errors become flash messages)."""
+
+    redirect_to = 'warehouse'
+
+    def handle_api_error(self, request, exc):
+        if wants_json(request):
+            return error_response(exc.message, status=exc.status)
+        messages.error(request, exc.message)
+        return redirect(self.redirect_to)
+
+
+# --------------------------------------------------------------------------- #
+# Transactions
+# --------------------------------------------------------------------------- #
+
+def filter_transactions(params):
+    qs = Transaction.objects.select_related('method')
+    if params.get('type'):
+        qs = qs.filter(type=parse_choice(params['type'], TRANSACTION_TYPES, 'Type'))
+    if params.get('method'):
+        qs = qs.filter(method_id=parse_int(params['method'], 'Method', minimum=1))
+    if params.get('date_from'):
+        qs = qs.filter(date__gte=parse_date(params['date_from'], 'Start date', allow_future=True))
+    if params.get('date_to'):
+        qs = qs.filter(date__lte=parse_date(params['date_to'], 'End date', allow_future=True))
+    if params.get('currency'):
+        qs = qs.filter(currency=parse_choice(params['currency'], CURRENCIES, 'Currency'))
+    return qs
+
+
+def transaction_stats(qs):
+    """Income / expense / balance for every currency, as plain numbers."""
+    totals = {(row['currency'], row['type']): row['total']
+              for row in qs.order_by().values('currency', 'type').annotate(total=Sum('amount'))}
+    result = {}
+    for curr in CURRENCIES:
+        inc = totals.get((curr, Transaction.TYPE_INCOME)) or Decimal('0')
+        exp = totals.get((curr, Transaction.TYPE_EXPENSE)) or Decimal('0')
+        result[f'incomes_{curr}'] = num(inc)
+        result[f'expenses_{curr}'] = num(exp)
+        result[f'balance_{curr}'] = num(inc - exp)
+    return result
+
+
+def clean_transaction(data, current=None):
+    """Validated field values for a Transaction; `current` supplies defaults when updating."""
+    def pick(key, fallback):
+        return data[key] if key in data else fallback
+
+    method_id = parse_int(pick('method', current.method_id if current else None), 'Payment method', minimum=1)
+    if not PaymentMethod.objects.filter(id=method_id).exists():
+        raise APIError('Unknown payment method.')
+    return {
+        'type': parse_choice(pick('type', current.type if current else None), TRANSACTION_TYPES, 'Type'),
+        'currency': parse_choice(pick('currency', current.currency if current else 'uzs'), CURRENCIES, 'Currency'),
+        'amount': parse_decimal(pick('amount', current.amount if current else None), 'Amount', maximum=MAX_AMOUNT),
+        'description': parse_text(pick('description', current.description if current else ''), 'Description', 255),
+        'date': parse_date(pick('date', current.date.isoformat() if current else None), 'Date'),
+        'method_id': method_id,
+    }
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'dashboard.html'
 
-    def get_transactions(self):
-        return Transaction.objects.all()
-
-    def set_balance(self, transactions, kwargs):
-        """Stats per currency: UZS, USD, AFN"""
-        for curr in ['uzs', 'usd', 'afn']:
-            qs = transactions.filter(currency=curr)
-            inc = qs.filter(type=Transaction.TYPE_INCOME).aggregate(
-                total=Coalesce(Sum('amount'), 0)
-            )['total']
-            exp = qs.filter(type=Transaction.TYPE_EXPENSE).aggregate(
-                total=Coalesce(Sum('amount'), 0)
-            )['total']
-            kwargs[f'incomes_{curr}'] = inc
-            kwargs[f'expenses_{curr}'] = exp
-            kwargs[f'balance_{curr}'] = inc - exp
-
     def get_context_data(self, **kwargs):
-        transactions = self.get_transactions()
-        payment_methods = PaymentMethod.objects.all()
-        kwargs['transactions'] = transactions
-        kwargs['payment_methods'] = payment_methods
-
-        self.set_balance(transactions, kwargs)
+        transactions = Transaction.objects.select_related('method')
+        kwargs['transactions'] = transactions.order_by('-date', '-id')[:TRANSACTION_PAGE_SIZE]
+        kwargs['transactions_total'] = transactions.count()
+        kwargs['payment_methods'] = PaymentMethod.objects.all()
+        kwargs.update(transaction_stats(transactions))
         return super().get_context_data(**kwargs)
+
+
+class TransactionListAPIView(ApiView):
+    """API endpoint to list transactions with filters"""
+
+    def get(self, request):
+        queryset = filter_transactions(request.GET)
+        limit = parse_int(request.GET.get('limit'), 'Limit', minimum=1, maximum=MAX_TRANSACTION_LIMIT,
+                          default=TRANSACTION_PAGE_SIZE)
+        return JsonResponse({
+            'total': queryset.count(),
+            'transactions': [
+                {
+                    'id': t.id,
+                    'type': t.type,
+                    'currency': t.currency,
+                    'amount': num(t.amount),
+                    'description': t.description,
+                    'date': t.date.isoformat(),
+                    'method_id': t.method_id,
+                    'method_name': t.method.name,
+                }
+                for t in queryset.order_by('-date', '-id')[:limit]
+            ]
+        })
+
+
+class StatsAPIView(ApiView):
+    """API endpoint to get stats with filters"""
+
+    def get(self, request):
+        return JsonResponse(transaction_stats(filter_transactions(request.GET)))
+
+
+class CreateTransactionAPIView(ApiView):
+    """API endpoint to create a transaction"""
+
+    def post(self, request):
+        created = Transaction.objects.create(**clean_transaction(load_json(request)))
+        return JsonResponse({'success': True, 'id': created.id})
+
+
+class TransactionDetailAPIView(ApiView):
+    """API endpoint to get or update a transaction"""
+
+    def get(self, request, transaction_id):
+        t = get_or_404(Transaction, transaction_id, 'Transaction')
+        return JsonResponse({
+            'id': t.id,
+            'type': t.type,
+            'currency': t.currency,
+            'amount': num(t.amount),
+            'description': t.description,
+            'date': t.date.isoformat(),
+            'method': t.method_id,
+        })
+
+    def post(self, request, transaction_id):
+        t = get_or_404(Transaction, transaction_id, 'Transaction')
+        for field, value in clean_transaction(load_json(request), current=t).items():
+            setattr(t, field, value)
+        t.save()
+        return JsonResponse({'success': True, 'id': t.id})
+
+
+class DeleteTransactionAPIView(ApiView):
+    """API endpoint to delete a transaction"""
+
+    def post(self, request, transaction_id):
+        get_or_404(Transaction, transaction_id, 'Transaction').delete()
+        return JsonResponse({'success': True})
+
+
+# --------------------------------------------------------------------------- #
+# Users
+# --------------------------------------------------------------------------- #
+
+def user_payload(user):
+    return {
+        'id': user.id,
+        'username': user.username,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'email': user.email,
+        'is_active': user.is_active,
+        'is_staff': user.is_staff,
+    }
+
+
+def password_error(password, user=None):
+    """Return a human readable message if the password is rejected, else None."""
+    try:
+        validate_password(password, user)
+    except DjangoValidationError as exc:
+        return ' '.join(exc.messages)
+    return None
 
 
 class UsersView(LoginRequiredMixin, TemplateView):
     template_name = 'users.html'
 
     def get_context_data(self, **kwargs):
-        users = User.objects.all()
-        kwargs['users'] = users
+        kwargs['users'] = User.objects.all()
         return super().get_context_data(**kwargs)
 
 
-class TransactionListAPIView(LoginRequiredMixin, View):
-    """API endpoint to list transactions with filters"""
-    
-    def get(self, request):
-        transactions = Transaction.objects.all()
-        
-        # Filter by type
-        transaction_type = request.GET.get('type')
-        if transaction_type:
-            transactions = transactions.filter(type=transaction_type)
-        
-        # Filter by method
-        method_id = request.GET.get('method')
-        if method_id:
-            transactions = transactions.filter(method_id=method_id)
-        
-        # Filter by date range
-        date_from = request.GET.get('date_from')
-        if date_from:
-            transactions = transactions.filter(date__gte=date_from)
-        
-        date_to = request.GET.get('date_to')
-        if date_to:
-            transactions = transactions.filter(date__lte=date_to)
-        
-        # Filter by currency
-        currency = request.GET.get('currency')
-        if currency and currency in ('uzs', 'usd', 'afn'):
-            transactions = transactions.filter(currency=currency)
-        
-        data = {
-            'transactions': [
-                {
-                    'id': t.id,
-                    'type': t.type,
-                    'currency': t.currency,
-                    'amount': t.amount,
-                    'description': t.description,
-                    'date': t.date.isoformat(),
-                    'method_id': t.method_id,
-                    'method_name': t.method.name,
-                }
-                for t in transactions
-            ]
-        }
-        
-        return JsonResponse(data)
-
-
-class StatsAPIView(LoginRequiredMixin, View):
-    """API endpoint to get stats with filters"""
-    
-    def get(self, request):
-        transactions = Transaction.objects.all()
-        
-        # Filter by type
-        transaction_type = request.GET.get('type')
-        if transaction_type:
-            transactions = transactions.filter(type=transaction_type)
-        
-        # Filter by method
-        method_id = request.GET.get('method')
-        if method_id:
-            transactions = transactions.filter(method_id=method_id)
-        
-        # Filter by date range
-        date_from = request.GET.get('date_from')
-        if date_from:
-            transactions = transactions.filter(date__gte=date_from)
-        
-        date_to = request.GET.get('date_to')
-        if date_to:
-            transactions = transactions.filter(date__lte=date_to)
-        
-        # Filter by currency
-        currency = request.GET.get('currency')
-        if currency and currency in ('uzs', 'usd', 'afn'):
-            transactions = transactions.filter(currency=currency)
-        
-        result = {}
-        for curr in ['uzs', 'usd', 'afn']:
-            qs = transactions.filter(currency=curr)
-            inc = qs.filter(type=Transaction.TYPE_INCOME).aggregate(
-                total=Coalesce(Sum('amount'), 0)
-            )['total']
-            exp = qs.filter(type=Transaction.TYPE_EXPENSE).aggregate(
-                total=Coalesce(Sum('amount'), 0)
-            )['total']
-            result[f'incomes_{curr}'] = inc
-            result[f'expenses_{curr}'] = exp
-            result[f'balance_{curr}'] = inc - exp
-        
-        return JsonResponse(result)
-
-
-def check_staff_permission(user):
-    """Check if user has staff permission for write operations"""
-    if not user.is_staff:
-        return JsonResponse({
-            'success': False,
-            'error': 'Permission denied. Only staff users can perform this action.',
-        }, status=403)
-    return None
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class CreateTransactionAPIView(LoginRequiredMixin, View):
-    """API endpoint to create a transaction"""
-    
-    def post(self, request):
-        # Check staff permission
-        perm_check = check_staff_permission(request.user)
-        if perm_check:
-            return perm_check
-            
-        try:
-            data = json.loads(request.body)
-            
-            currency = data.get('currency', 'uzs')
-            if currency not in ('uzs', 'usd', 'afn'):
-                currency = 'uzs'
-            transaction = Transaction.objects.create(
-                type=data.get('type'),
-                amount=int(data.get('amount')),
-                description=data.get('description', ''),
-                date=data.get('date'),
-                method_id=int(data.get('method')),
-                currency=currency,
-            )
-            
-            return JsonResponse({
-                'success': True,
-                'id': transaction.id,
-            })
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class TransactionDetailAPIView(LoginRequiredMixin, View):
-    """API endpoint to get, update, or delete a transaction"""
-    
-    def get(self, request, transaction_id):
-        try:
-            transaction = Transaction.objects.get(id=transaction_id)
-            return JsonResponse({
-                'id': transaction.id,
-                'type': transaction.type,
-                'currency': transaction.currency,
-                'amount': transaction.amount,
-                'description': transaction.description,
-                'date': transaction.date.isoformat(),
-                'method': transaction.method_id,
-            })
-        except Transaction.DoesNotExist:
-            return JsonResponse({
-                'error': 'Transaction not found'
-            }, status=404)
-    
-    def post(self, request, transaction_id):
-        # Check staff permission
-        perm_check = check_staff_permission(request.user)
-        if perm_check:
-            return perm_check
-            
-        try:
-            data = json.loads(request.body)
-            transaction = Transaction.objects.get(id=transaction_id)
-            
-            transaction.type = data.get('type', transaction.type)
-            transaction.amount = int(data.get('amount', transaction.amount))
-            transaction.description = data.get('description', transaction.description)
-            transaction.date = data.get('date', transaction.date)
-            transaction.method_id = int(data.get('method', transaction.method_id))
-            curr = data.get('currency')
-            if curr in ('uzs', 'usd', 'afn'):
-                transaction.currency = curr
-            transaction.save()
-            
-            return JsonResponse({
-                'success': True,
-                'id': transaction.id,
-            })
-        except Transaction.DoesNotExist:
-            return JsonResponse({
-                'error': 'Transaction not found'
-            }, status=404)
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class DeleteTransactionAPIView(LoginRequiredMixin, View):
-    """API endpoint to delete a transaction"""
-    
-    def post(self, request, transaction_id):
-        # Check staff permission
-        perm_check = check_staff_permission(request.user)
-        if perm_check:
-            return perm_check
-            
-        try:
-            transaction = Transaction.objects.get(id=transaction_id)
-            transaction.delete()
-            return JsonResponse({
-                'success': True,
-            })
-        except Transaction.DoesNotExist:
-            return JsonResponse({
-                'error': 'Transaction not found'
-            }, status=404)
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
-
-
-class UsersListAPIView(LoginRequiredMixin, View):
+class UsersListAPIView(ApiView):
     """API endpoint to list users"""
-    
+
     def get(self, request):
-        users = User.objects.all()
-        data = {
-            'users': [
-                {
-                    'id': u.id,
-                    'username': u.username,
-                    'first_name': u.first_name,
-                    'last_name': u.last_name,
-                    'email': u.email,
-                    'is_active': u.is_active,
-                    'is_staff': u.is_staff,
-                }
-                for u in users
-            ]
-        }
-        return JsonResponse(data)
+        return JsonResponse({'users': [user_payload(u) for u in User.objects.all()]})
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class CreateUserAPIView(LoginRequiredMixin, View):
+class CreateUserAPIView(ApiView):
     """API endpoint to create a user"""
-    
+
     def post(self, request):
-        try:
-            data = json.loads(request.body)
-            
-            # Check if username already exists
-            if User.objects.filter(username=data.get('username')).exists():
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Username already exists',
-                }, status=400)
-            
-            user = User.objects.create_user(
-                username=data.get('username'),
-                password=data.get('password'),
-                first_name=data.get('first_name', ''),
-                last_name=data.get('last_name', ''),
-                email=data.get('email', ''),
-                is_staff=data.get('is_staff', False),
-                is_active=data.get('is_active', True),
-            )
-            
-            return JsonResponse({
-                'success': True,
-                'id': user.id,
-            })
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
+        data = load_json(request)
+        username = parse_text(data.get('username'), 'Username', 150, required=True)
+        password = data.get('password') or ''
+        if User.objects.filter(username__iexact=username).exists():
+            raise APIError('Username already exists.')
+        message = password_error(password, User(username=username))
+        if message:
+            raise APIError(message)
+
+        user = User.objects.create_user(
+            username=username,
+            password=password,
+            first_name=parse_text(data.get('first_name'), 'First name', 150),
+            last_name=parse_text(data.get('last_name'), 'Last name', 150),
+            email=parse_email(data.get('email')),
+            is_staff=parse_bool(data.get('is_staff'), 'Staff flag', default=False),
+            is_active=parse_bool(data.get('is_active'), 'Active flag', default=True),
+        )
+        return JsonResponse({'success': True, 'id': user.id})
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class UserDetailAPIView(LoginRequiredMixin, View):
-    """API endpoint to get, update, or delete a user"""
-    
+class UserDetailAPIView(ApiView):
+    """API endpoint to get or update a user"""
+
     def get(self, request, user_id):
-        try:
-            user = User.objects.get(id=user_id)
-            return JsonResponse({
-                'id': user.id,
-                'username': user.username,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'email': user.email,
-                'is_active': user.is_active,
-                'is_staff': user.is_staff,
-            })
-        except User.DoesNotExist:
-            return JsonResponse({
-                'error': 'User not found'
-            }, status=404)
-    
+        return JsonResponse(user_payload(get_or_404(User, user_id, 'User')))
+
     def post(self, request, user_id):
-        try:
-            data = json.loads(request.body)
-            user = User.objects.get(id=user_id)
-            
-            user.first_name = data.get('first_name', user.first_name)
-            user.last_name = data.get('last_name', user.last_name)
-            user.email = data.get('email', user.email)
-            user.is_staff = data.get('is_staff', user.is_staff)
-            user.is_active = data.get('is_active', user.is_active)
-            
-            # Update password if provided
-            password = data.get('password')
-            if password:
-                user.set_password(password)
-            
-            user.save()
-            
-            return JsonResponse({
-                'success': True,
-                'id': user.id,
-            })
-        except User.DoesNotExist:
-            return JsonResponse({
-                'error': 'User not found'
-            }, status=404)
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
+        user = get_or_404(User, user_id, 'User')
+
+        # Only superusers may modify superuser accounts (prevents staff -> superuser takeover).
+        if user.is_superuser and not request.user.is_superuser:
+            raise APIError('Only a superuser can modify a superuser.', status=403)
+
+        data = load_json(request)
+        is_staff = parse_bool(data.get('is_staff'), 'Staff flag', default=user.is_staff)
+        is_active = parse_bool(data.get('is_active'), 'Active flag', default=user.is_active)
+        if user.id == request.user.id and (not is_staff or not is_active):
+            raise APIError('You cannot remove your own staff access or deactivate yourself.')
+
+        password = data.get('password')
+        if password:
+            message = password_error(password, user)
+            if message:
+                raise APIError(message)
+            user.set_password(password)
+
+        user.first_name = parse_text(data.get('first_name', user.first_name), 'First name', 150)
+        user.last_name = parse_text(data.get('last_name', user.last_name), 'Last name', 150)
+        user.email = parse_email(data.get('email', user.email))
+        user.is_staff = is_staff
+        user.is_active = is_active
+        user.save()
+        return JsonResponse({'success': True, 'id': user.id})
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class DeleteUserAPIView(LoginRequiredMixin, View):
+class DeleteUserAPIView(ApiView):
     """API endpoint to delete a user"""
-    
+
     def post(self, request, user_id):
-        try:
-            user = User.objects.get(id=user_id)
-            user.delete()
-            return JsonResponse({
-                'success': True,
-            })
-        except User.DoesNotExist:
-            return JsonResponse({
-                'error': 'User not found'
-            }, status=404)
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
+        user = get_or_404(User, user_id, 'User')
+        if user.id == request.user.id:
+            raise APIError('You cannot delete your own account.')
+        if user.is_superuser and not request.user.is_superuser:
+            raise APIError('Only a superuser can delete a superuser.', status=403)
+        user.delete()
+        return JsonResponse({'success': True})
+
+
+# --------------------------------------------------------------------------- #
+# Employees and monthly accounts
+# --------------------------------------------------------------------------- #
+
+def entry_balances(entry_ids):
+    """{entry_id: {'uzs': Decimal, 'usd': Decimal, 'afn': Decimal}} = products - payments per currency."""
+    balances = {eid: {curr: Decimal('0') for curr in CURRENCIES} for eid in entry_ids}
+    products = (MonthlyProduct.objects.filter(monthly_entry_id__in=entry_ids)
+                .order_by().values('monthly_entry_id', 'currency').annotate(total=Sum('total_amount')))
+    payments = (MonthlyPayment.objects.filter(monthly_entry_id__in=entry_ids)
+                .order_by().values('monthly_entry_id', 'currency').annotate(total=Sum('amount')))
+    for row in products:
+        balances[row['monthly_entry_id']][row['currency']] += row['total']
+    for row in payments:
+        balances[row['monthly_entry_id']][row['currency']] -= row['total']
+    return balances
+
+
+def clean_employee(data, current=None):
+    def pick(key, fallback):
+        return data[key] if key in data else fallback
+
+    return {
+        'first_name': parse_text(pick('first_name', current.first_name if current else None), 'First name', 100, required=True),
+        'last_name': parse_text(pick('last_name', current.last_name if current else None), 'Last name', 100, required=True),
+        'position': parse_text(pick('position', current.position if current else ''), 'Position', 100),
+        'phone': parse_text(pick('phone', current.phone if current else ''), 'Phone', 20),
+        'email': parse_email(pick('email', current.email if current else '')),
+        'is_active': parse_bool(data.get('is_active'), 'Active flag', default=current.is_active if current else True),
+    }
 
 
 class MonthlyView(LoginRequiredMixin, TemplateView):
     template_name = 'monthly.html'
 
     def get_context_data(self, **kwargs):
-        from django.utils import timezone
-        
-        employees = Employee.objects.filter(is_active=True)
-        kwargs['employees'] = employees
-        
-        # Get or create monthly entry for current month
-        today = timezone.now().date()
-        first_day = today.replace(day=1)
-        
-        monthly_entries = {}
-        for emp in employees:
-            entry, created = MonthlyEntry.objects.get_or_create(
-                employee=emp,
-                month=first_day
-            )
-            monthly_entries[emp.id] = entry
-        
-        kwargs['monthly_entries'] = monthly_entries
+        kwargs['employees'] = Employee.objects.filter(is_active=True)
         return super().get_context_data(**kwargs)
 
 
-class EmployeeListAPIView(LoginRequiredMixin, View):
+class EmployeeListAPIView(ApiView):
     """API endpoint to list employees"""
-    
+
     def get(self, request):
-        # All logged-in users can view employee list
-        employees = Employee.objects.all()
-        data = {
+        return JsonResponse({
             'employees': [
                 {
                     'id': e.id,
@@ -452,743 +540,351 @@ class EmployeeListAPIView(LoginRequiredMixin, View):
                     'position': e.position,
                     'is_active': e.is_active,
                 }
-                for e in employees
+                for e in Employee.objects.all()
             ]
-        }
-        return JsonResponse(data)
+        })
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class CreateEmployeeAPIView(LoginRequiredMixin, View):
+class CreateEmployeeAPIView(ApiView):
     """API endpoint to create an employee"""
-    
+
     def post(self, request):
-        # Check staff permission
-        if not request.user.is_staff:
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({'error': 'Not authorized'}, status=403)
-            return redirect('monthly')
-        
-        try:
-            # Check if it's form data or JSON
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                data = json.loads(request.body)
-            else:
-                # Form data
-                data = request.POST.dict()
-            
-            employee = Employee.objects.create(
-                first_name=data.get('first_name'),
-                last_name=data.get('last_name'),
-                position=data.get('position', ''),
-                phone=data.get('phone', ''),
-                email=data.get('email', ''),
-                is_active=data.get('is_active', True),
-            )
-            
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': True,
-                    'id': employee.id,
-                })
-            return redirect('monthly')
-        except Exception as e:
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': False,
-                    'error': str(e),
-                }, status=400)
-            return redirect('monthly')
+        employee = Employee.objects.create(**clean_employee(load_json(request)))
+        return JsonResponse({'success': True, 'id': employee.id})
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class EmployeeDetailAPIView(LoginRequiredMixin, View):
-    """API endpoint to get, update, or delete an employee"""
-    
+class EmployeeDetailAPIView(ApiView):
+    """API endpoint to get or update an employee"""
+
     def get(self, request, employee_id):
-        # All logged-in users can view employee details
-        try:
-            employee = Employee.objects.get(id=employee_id)
-            return JsonResponse({
-                'id': employee.id,
-                'first_name': employee.first_name,
-                'last_name': employee.last_name,
-                'position': employee.position,
-                'phone': employee.phone,
-                'email': employee.email,
-                'is_active': employee.is_active,
-            })
-        except Employee.DoesNotExist:
-            return JsonResponse({
-                'error': 'Employee not found'
-            }, status=404)
-    
+        e = get_or_404(Employee, employee_id, 'Employee')
+        return JsonResponse({
+            'id': e.id,
+            'first_name': e.first_name,
+            'last_name': e.last_name,
+            'position': e.position,
+            'phone': e.phone,
+            'email': e.email,
+            'is_active': e.is_active,
+        })
+
     def post(self, request, employee_id):
-        # Check staff permission
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
-        try:
-            data = json.loads(request.body)
-            employee = Employee.objects.get(id=employee_id)
-            
-            employee.first_name = data.get('first_name', employee.first_name)
-            employee.last_name = data.get('last_name', employee.last_name)
-            employee.position = data.get('position', employee.position)
-            employee.phone = data.get('phone', employee.phone)
-            employee.email = data.get('email', employee.email)
-            employee.is_active = data.get('is_active', employee.is_active)
-            employee.save()
-            
-            return JsonResponse({
-                'success': True,
-                'id': employee.id,
-            })
-        except Employee.DoesNotExist:
-            return JsonResponse({
-                'error': 'Employee not found'
-            }, status=404)
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
+        employee = get_or_404(Employee, employee_id, 'Employee')
+        for field, value in clean_employee(load_json(request), current=employee).items():
+            setattr(employee, field, value)
+        employee.save()
+        return JsonResponse({'success': True, 'id': employee.id})
 
 
-class DeleteEmployeeAPIView(LoginRequiredMixin, View):
-    """API endpoint to delete an employee"""
-    
+class DeleteEmployeeAPIView(ApiView):
+    """API endpoint to delete an employee (and, by cascade, their monthly records)"""
+
     def post(self, request, employee_id):
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
-        try:
-            employee = Employee.objects.get(id=employee_id)
-            employee.delete()
-            
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': True,
-                    'message': 'Employee deleted successfully',
-                })
-            return redirect('monthly')
-        except Employee.DoesNotExist:
-            return JsonResponse({'error': 'Employee not found'}, status=404)
-        except Exception as e:
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': False,
-                    'error': str(e),
-                }, status=400)
-            return redirect('monthly')
+        get_or_404(Employee, employee_id, 'Employee').delete()
+        return JsonResponse({'success': True, 'message': 'Employee deleted successfully'})
 
 
-class MonthlyEntryListAPIView(LoginRequiredMixin, View):
+class MonthlyEntryListAPIView(ApiView):
     """API endpoint to list monthly entries"""
-    
+
     def get(self, request):
-        employee_id = request.GET.get('employee_id')
-        
-        entries = MonthlyEntry.objects.all()
-        if employee_id:
-            entries = entries.filter(employee_id=employee_id)
-        
-        data = {
+        entries = MonthlyEntry.objects.select_related('employee')
+        if request.GET.get('employee_id'):
+            entries = entries.filter(employee_id=parse_int(request.GET['employee_id'], 'Employee', minimum=1))
+        entries = list(entries)
+        balances = entry_balances([e.id for e in entries])
+        return JsonResponse({
             'entries': [
                 {
                     'id': e.id,
                     'employee_id': e.employee_id,
                     'employee_name': str(e.employee),
                     'month': e.month.isoformat(),
-                    'balance': str(e.balance),
+                    **{f'balance_{curr}': money_str(balances[e.id][curr]) for curr in CURRENCIES},
                 }
                 for e in entries
             ]
-        }
-        return JsonResponse(data)
+        })
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class CreateMonthlyEntryAPIView(LoginRequiredMixin, View):
-    """API endpoint to create a monthly entry"""
-    
+class CreateMonthlyEntryAPIView(ApiView):
+    """API endpoint to create a monthly entry (defaults to the current month)"""
+
     def post(self, request):
-        # Check staff permission
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
+        data = load_json(request)
+        employee = get_or_404(Employee, parse_int(data.get('employee_id'), 'Employee', minimum=1), 'Employee')
+        month = parse_date(data['month'], 'Month', allow_future=True).replace(day=1) if data.get('month') else current_month_start()
         try:
-            data = json.loads(request.body)
-            
-            employee_id = int(data.get('employee_id'))
-            month = data.get('month')
-            
-            # Check if entry already exists
-            existing_entry = MonthlyEntry.objects.filter(
-                employee_id=employee_id,
-                month=month
-            ).first()
-            
-            if existing_entry:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Monthly entry already exists for this employee and month',
-                }, status=400)
-            
-            entry = MonthlyEntry.objects.create(
-                employee_id=employee_id,
-                month=month,
-                balance=Decimal('0')
-            )
-            
-            return JsonResponse({
-                'success': True,
-                'id': entry.id,
-            })
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
+            with db_transaction.atomic():
+                entry, created = MonthlyEntry.objects.get_or_create(employee=employee, month=month)
+        except IntegrityError:
+            created = False
+        if not created:
+            raise APIError('Monthly entry already exists for this employee and month.')
+        return JsonResponse({'success': True, 'id': entry.id})
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-@method_decorator(csrf_exempt, name='dispatch')
-class MonthlyEntryDetailAPIView(LoginRequiredMixin, View):
+class MonthlyEntryDetailAPIView(ApiView):
     """API endpoint to get monthly entry details with products and payments"""
-    
+
     def get(self, request, entry_id):
-        try:
-            entry = MonthlyEntry.objects.get(id=entry_id)
-            
-            products = entry.products.all()
-            payments = entry.payments.all()
-            
-            # Calculate balances by currency
-            balance_uzs = sum(Decimal(p.total_amount) for p in products if p.currency == 'uzs') - sum(Decimal(p.amount) for p in payments if p.currency == 'uzs')
-            balance_usd = sum(Decimal(p.total_amount) for p in products if p.currency == 'usd') - sum(Decimal(p.amount) for p in payments if p.currency == 'usd')
-            balance_afn = sum(Decimal(p.total_amount) for p in products if p.currency == 'afn') - sum(Decimal(p.amount) for p in payments if p.currency == 'afn')
-            
-            return JsonResponse({
-                'id': entry.id,
-                'employee_id': entry.employee_id,
-                'employee_name': str(entry.employee),
-                'month': entry.month.isoformat(),
-                'balance': str(entry.balance),
-                'balance_uzs': str(balance_uzs),
-                'balance_usd': str(balance_usd),
-                'balance_afn': str(balance_afn),
-                'products': [
-                    {
-                        'id': p.id,
-                        'product_name': p.product_name,
-                        'quantity': str(p.quantity),
-                        'unit_type': p.unit_type,
-                        'price_per_unit': str(p.price_per_unit),
-                        'currency': p.currency,
-                        'total_amount': str(p.total_amount),
-                    }
-                    for p in products
-                ],
-                'payments': [
-                    {
-                        'id': p.id,
-                        'amount': str(p.amount),
-                        'currency': p.currency,
-                        'description': p.description,
-                        'payment_date': p.payment_date.isoformat(),
-                    }
-                    for p in payments
-                ],
-            })
-        except MonthlyEntry.DoesNotExist:
-            return JsonResponse({
-                'error': 'Monthly entry not found'
-            }, status=404)
+        entry = get_or_404(MonthlyEntry.objects.select_related('employee'), entry_id, 'Monthly entry')
+        balances = entry_balances([entry.id])[entry.id]
+        return JsonResponse({
+            'id': entry.id,
+            'employee_id': entry.employee_id,
+            'employee_name': str(entry.employee),
+            'month': entry.month.isoformat(),
+            **{f'balance_{curr}': money_str(balances[curr]) for curr in CURRENCIES},
+            'products': [
+                {
+                    'id': p.id,
+                    'product_name': p.product_name,
+                    'quantity': str(p.quantity),
+                    'unit_type': p.unit_type,
+                    'price_per_unit': str(p.price_per_unit),
+                    'currency': p.currency,
+                    'total_amount': str(p.total_amount),
+                }
+                for p in entry.products.all()
+            ],
+            'payments': [
+                {
+                    'id': p.id,
+                    'amount': str(p.amount),
+                    'currency': p.currency,
+                    'description': p.description,
+                    'payment_date': p.payment_date.isoformat(),
+                }
+                for p in entry.payments.all()
+            ],
+        })
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class AddProductAPIView(LoginRequiredMixin, View):
-    """API endpoint to add a product to monthly entry"""
-    
+class AddProductAPIView(ApiView):
+    """API endpoint to add a product to a monthly entry"""
+
     def post(self, request):
-        # Check staff permission
-        if not request.user.is_staff:
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({'error': 'Not authorized'}, status=403)
-            return redirect('monthly')
-        
-        try:
-            # Check if it's form data or JSON
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                data = json.loads(request.body)
-            else:
-                # Form data
-                data = request.POST.dict()
-            
-            entry_id = int(data.get('entry_id'))
-            product_name = data.get('product_name')
-            quantity = Decimal(data.get('quantity'))
-            price_per_unit = Decimal(data.get('price_per_unit'))
-            unit_type = data.get('unit_type', 'dona')  # 'dona' or 'kg'
-            currency = data.get('currency', 'uzs')  # 'uzs', 'usd', or 'afn'
-            
-            entry = MonthlyEntry.objects.get(id=entry_id)
-            
-            total_amount = quantity * price_per_unit
-            
-            product = MonthlyProduct.objects.create(
-                monthly_entry=entry,
-                product_name=product_name,
-                quantity=quantity,
-                unit_type=unit_type,
-                price_per_unit=price_per_unit,
-                currency=currency,
-                total_amount=total_amount
-            )
-            
-            # Update balance
-            entry.balance += total_amount
-            entry.save()
-            
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': True,
-                    'id': product.id,
-                    'new_balance': str(entry.balance),
-                })
-            return redirect(f'/monthly/?emp_id={entry.employee_id}')
-        except Exception as e:
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': False,
-                    'error': str(e),
-                }, status=400)
-            return redirect('monthly')
+        data = load_json(request)
+        entry = get_or_404(MonthlyEntry, parse_int(data.get('entry_id'), 'Entry', minimum=1), 'Monthly entry')
+        quantity = parse_decimal(data.get('quantity'), 'Quantity', maximum=MAX_TOTAL)
+        price = parse_decimal(data.get('price_per_unit'), 'Price per unit', maximum=MAX_UNIT_PRICE)
+        total = (quantity * price).quantize(MONEY_STEP, rounding=ROUND_HALF_UP)
+        if total > MAX_TOTAL:
+            raise APIError('Total amount is too large.')
+        product = MonthlyProduct.objects.create(
+            monthly_entry=entry,
+            product_name=parse_text(data.get('product_name'), 'Product name', 255, required=True),
+            quantity=quantity,
+            unit_type=parse_choice(data.get('unit_type', MonthlyProduct.UNIT_DONA), UNIT_TYPES, 'Unit type'),
+            price_per_unit=price,
+            currency=parse_choice(data.get('currency', 'uzs'), CURRENCIES, 'Currency'),
+            total_amount=total,
+        )
+        return JsonResponse({'success': True, 'id': product.id})
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class DeleteProductAPIView(LoginRequiredMixin, View):
+class DeleteProductAPIView(ApiView):
     """API endpoint to delete a product"""
-    
+
     def post(self, request, product_id):
-        # Check staff permission
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
-        try:
-            product = MonthlyProduct.objects.get(id=product_id)
-            entry = product.monthly_entry
-            
-            # Subtract from balance
-            entry.balance -= product.total_amount
-            entry.save()
-            
-            product.delete()
-            
-            return JsonResponse({
-                'success': True,
-                'new_balance': str(entry.balance),
-            })
-        except MonthlyProduct.DoesNotExist:
-            return JsonResponse({
-                'error': 'Product not found'
-            }, status=404)
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
+        get_or_404(MonthlyProduct, product_id, 'Product').delete()
+        return JsonResponse({'success': True})
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class AddPaymentAPIView(LoginRequiredMixin, View):
-    """API endpoint to add a payment (deduct from balance)"""
-    
+class AddPaymentAPIView(ApiView):
+    """API endpoint to record a payment against a monthly entry"""
+
     def post(self, request):
-        # Check staff permission
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
-        try:
-            data = json.loads(request.body)
-            
-            entry_id = int(data.get('entry_id'))
-            amount = Decimal(data.get('amount'))
-            currency = data.get('currency', 'uzs')  # 'uzs', 'usd', or 'afn'
-            description = data.get('description', '')
-            payment_date = data.get('payment_date')
-            
-            entry = MonthlyEntry.objects.get(id=entry_id)
-            
-            payment = MonthlyPayment.objects.create(
-                monthly_entry=entry,
-                amount=amount,
-                currency=currency,
-                description=description,
-                payment_date=payment_date
-            )
-            
-            # Deduct from balance
-            entry.balance -= amount
-            entry.save()
-            
-            return JsonResponse({
-                'success': True,
-                'id': payment.id,
-                'new_balance': str(entry.balance),
-            })
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
+        data = load_json(request)
+        entry = get_or_404(MonthlyEntry, parse_int(data.get('entry_id'), 'Entry', minimum=1), 'Monthly entry')
+        payment = MonthlyPayment.objects.create(
+            monthly_entry=entry,
+            amount=parse_decimal(data.get('amount'), 'Amount', maximum=MAX_TOTAL),
+            currency=parse_choice(data.get('currency', 'uzs'), CURRENCIES, 'Currency'),
+            description=parse_text(data.get('description'), 'Description', 255),
+            payment_date=parse_date(data.get('payment_date'), 'Payment date'),
+        )
+        return JsonResponse({'success': True, 'id': payment.id})
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class DeletePaymentAPIView(LoginRequiredMixin, View):
+class DeletePaymentAPIView(ApiView):
     """API endpoint to delete a payment"""
-    
+
     def post(self, request, payment_id):
-        # Check staff permission
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
-        try:
-            payment = MonthlyPayment.objects.get(id=payment_id)
-            entry = payment.monthly_entry
-            
-            # Add back to balance
-            entry.balance += payment.amount
-            entry.save()
-            
-            payment.delete()
-            
-            return JsonResponse({
-                'success': True,
-                'new_balance': str(entry.balance),
-            })
-        except MonthlyPayment.DoesNotExist:
-            return JsonResponse({
-                'error': 'Payment not found'
-            }, status=404)
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
+        get_or_404(MonthlyPayment, payment_id, 'Payment').delete()
+        return JsonResponse({'success': True})
+
+
+# --------------------------------------------------------------------------- #
+# Warehouse
+# --------------------------------------------------------------------------- #
+
+def apply_stock_change(item, movement_type, quantity, quantity_kg):
+    """Apply a movement to the item's running stock; refuse to go below zero."""
+    sign = 1 if movement_type == WarehouseMovement.IN else -1
+    new_quantity = item.quantity + sign * quantity
+    new_kg = item.quantity_kg + sign * quantity_kg
+    if new_quantity < 0 or new_kg < 0:
+        raise APIError(
+            f'Not enough stock for "{item.name}": {item.quantity} pcs / {item.quantity_kg} kg available.')
+    item.quantity, item.quantity_kg = new_quantity, new_kg
+    item.save()
 
 
 class WarehouseView(LoginRequiredMixin, TemplateView):
     """View for warehouse inventory management"""
     template_name = 'warehouse.html'
-    
+
     def get_context_data(self, **kwargs):
-        items = WarehouseItem.objects.all()
-        movements = WarehouseMovement.objects.all().select_related('item').order_by('-created_at')
-        
-        # Apply filters
+        movements = WarehouseMovement.objects.select_related('item').order_by('-created_at')
+        filtered = movements
+
         item_id = self.request.GET.get('item_id')
+        if item_id and item_id.isdigit():
+            filtered = filtered.filter(item_id=int(item_id))
         movement_type = self.request.GET.get('type')
-        
-        filtered_movements = movements
-        
-        if item_id:
-            filtered_movements = filtered_movements.filter(item_id=item_id)
-        
-        if movement_type:
-            filtered_movements = filtered_movements.filter(type=movement_type)
-        
-        kwargs['items'] = items
+        if movement_type in MOVEMENT_TYPES:
+            filtered = filtered.filter(type=movement_type)
+
+        kwargs['items'] = WarehouseItem.objects.all()
         kwargs['movements'] = movements
-        kwargs['filtered_movements'] = filtered_movements
+        kwargs['filtered_movements'] = filtered
         return super().get_context_data(**kwargs)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class WarehouseItemListAPIView(LoginRequiredMixin, View):
-    """Get all warehouse items with their movements"""
-    
+class WarehouseItemListAPIView(ApiView):
+    """Get all warehouse items with their movements (staff only)"""
+
+    staff_methods = ('GET',)
+
     def get(self, request):
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
-        items = WarehouseItem.objects.all()
-        data = {
-            'items': []
-        }
-        
-        for item in items:
-            movements = WarehouseMovement.objects.filter(item=item).order_by('-date')
-            movements_list = []
-            for m in movements:
-                movements_list.append({
-                    'id': m.id,
-                    'type': m.type,
-                    'quantity': m.quantity,
-                    'quantity_kg': str(m.quantity_kg),
-                    'date': m.date.isoformat() if hasattr(m.date, 'isoformat') else str(m.date),
-                    'description': m.description or ''
-                })
-            
-            data['items'].append({
-                'id': item.id,
-                'name': item.name,
-                'description': item.description or '',
-                'quantity': item.quantity,
-                'quantity_kg': str(item.quantity_kg),
-                'movements': movements_list
-            })
-        
-        return JsonResponse(data)
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class CreateWarehouseItemAPIView(LoginRequiredMixin, View):
-    """Create a new warehouse item"""
-    
-    def post(self, request):
-        if not request.user.is_staff:
-            if request.content_type == 'application/json':
-                return JsonResponse({'error': 'Not authorized'}, status=403)
-            return redirect('warehouse')
-        
-        try:
-            # Check if it's form data or JSON
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                data = json.loads(request.body)
-                name = data.get('name', '').strip()
-                quantity = int(data.get('quantity', 0))
-                quantity_kg = Decimal(str(data.get('quantity_kg', 0)))
-                description = data.get('description', '').strip()
-            else:
-                # Form data
-                name = request.POST.get('name', '').strip()
-                quantity = int(request.POST.get('quantity', 0))
-                quantity_kg = Decimal(str(request.POST.get('quantity_kg', 0) or 0))
-                description = request.POST.get('description', '').strip()
-            
-            if not name:
-                if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                    return JsonResponse({'success': False, 'error': 'Name is required'}, status=400)
-                return redirect('warehouse')
-            
-            item = WarehouseItem.objects.create(
-                name=name,
-                quantity=quantity,
-                quantity_kg=quantity_kg,
-                description=description
-            )
-            
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': True,
+        items = WarehouseItem.objects.prefetch_related('movements')
+        return JsonResponse({
+            'items': [
+                {
                     'id': item.id,
                     'name': item.name,
-                    'quantity': item.quantity,
-                })
-            return redirect('warehouse')
-        except Exception as e:
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': False,
-                    'error': str(e),
-                }, status=400)
-            return redirect('warehouse')
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class WarehouseMovementAPIView(LoginRequiredMixin, View):
-    """Add a warehouse movement (in/out)"""
-    
-    def post(self, request):
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
-        try:
-            # Check if it's form data or JSON
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                data = json.loads(request.body)
-                item_id = int(data.get('item_id'))
-                movement_type = data.get('type')  # 'in' or 'out'
-                quantity = int(data.get('quantity', 0))
-                quantity_kg = Decimal(str(data.get('quantity_kg', 0) or 0))
-                date = data.get('date', datetime.now().date())
-                description = data.get('description', '').strip()
-            else:
-                # Form data
-                item_id = int(request.POST.get('item_id'))
-                movement_type = request.POST.get('type')
-                quantity = int(request.POST.get('quantity', 0))
-                quantity_kg = Decimal(str(request.POST.get('quantity_kg', 0) or 0))
-                date = request.POST.get('date', str(datetime.now().date()))
-                description = request.POST.get('description', '').strip()
-            
-            if not item_id or not movement_type or (quantity <= 0 and quantity_kg <= 0):
-                if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                    return JsonResponse({'success': False, 'error': 'Invalid data'}, status=400)
-                return redirect('warehouse')
-            
-            if movement_type not in ['in', 'out']:
-                if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                    return JsonResponse({'success': False, 'error': 'Type must be "in" or "out"'}, status=400)
-                return redirect('warehouse')
-            
-            item = WarehouseItem.objects.get(id=item_id)
-            
-            # Create movement record
-            movement = WarehouseMovement.objects.create(
-                item=item,
-                type=movement_type,
-                quantity=quantity,
-                quantity_kg=quantity_kg,
-                date=date,
-                description=description
-            )
-            
-            # Update item quantity and quantity_kg
-            if movement_type == 'in':
-                item.quantity += quantity
-                item.quantity_kg += quantity_kg
-            else:
-                item.quantity = max(0, item.quantity - quantity)
-                item.quantity_kg = max(Decimal('0'), item.quantity_kg - quantity_kg)
-            
-            item.save()
-            
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': True,
-                    'id': movement.id,
-                    'new_quantity': item.quantity,
-                })
-            return redirect('warehouse')
-        except WarehouseItem.DoesNotExist:
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({'error': 'Item not found'}, status=404)
-            return redirect('warehouse')
-        except Exception as e:
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': False,
-                    'error': str(e),
-                }, status=400)
-            return redirect('warehouse')
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class DeleteWarehouseMovementAPIView(LoginRequiredMixin, View):
-    """Delete a warehouse movement"""
-    
-    def post(self, request, movement_id):
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
-        try:
-            movement = WarehouseMovement.objects.get(id=movement_id)
-            item = movement.item
-            
-            # Reverse the quantity and quantity_kg update
-            if movement.type == 'in':
-                item.quantity -= movement.quantity
-                item.quantity_kg -= movement.quantity_kg
-            else:
-                item.quantity += movement.quantity
-                item.quantity_kg += movement.quantity_kg
-            
-            item.quantity = max(0, item.quantity)
-            item.quantity_kg = max(Decimal('0'), item.quantity_kg)
-            item.save()
-            
-            movement.delete()
-            
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': True,
-                    'new_quantity': item.quantity,
-                })
-            return redirect('warehouse')
-        except WarehouseMovement.DoesNotExist:
-            return JsonResponse({'error': 'Movement not found'}, status=404)
-        except Exception as e:
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': False,
-                    'error': str(e),
-                }, status=400)
-            return redirect('warehouse')
-
-
-class DeleteWarehouseItemAPIView(LoginRequiredMixin, View):
-    """Delete a warehouse item"""
-    
-    def post(self, request, item_id):
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
-        try:
-            item = WarehouseItem.objects.get(id=item_id)
-            item.delete()
-            
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': True,
-                    'message': 'Item deleted successfully',
-                })
-            return redirect('warehouse')
-        except WarehouseItem.DoesNotExist:
-            return JsonResponse({'error': 'Item not found'}, status=404)
-        except Exception as e:
-            if request.content_type == 'application/json' or 'application/json' in request.META.get('CONTENT_TYPE', ''):
-                return JsonResponse({
-                    'success': False,
-                    'error': str(e),
-                }, status=400)
-            return redirect('warehouse')
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
-
-
-class UpdateWarehouseItemAPIView(LoginRequiredMixin, View):
-    """Update a warehouse item"""
-    
-    def post(self, request, item_id):
-        if not request.user.is_staff:
-            return JsonResponse({'error': 'Not authorized'}, status=403)
-        
-        try:
-            item = WarehouseItem.objects.get(id=item_id)
-            data = json.loads(request.body)
-            
-            if 'name' in data:
-                item.name = data['name']
-            if 'description' in data:
-                item.description = data['description']
-            if 'quantity' in data:
-                item.quantity = int(data['quantity'])
-            if 'quantity_kg' in data:
-                item.quantity_kg = Decimal(str(data['quantity_kg']))
-            
-            item.save()
-            
-            return JsonResponse({
-                'success': True,
-                'item': {
-                    'id': item.id,
-                    'name': item.name,
-                    'description': item.description,
+                    'description': item.description or '',
                     'quantity': item.quantity,
                     'quantity_kg': str(item.quantity_kg),
+                    'movements': [
+                        {
+                            'id': m.id,
+                            'type': m.type,
+                            'quantity': m.quantity,
+                            'quantity_kg': str(m.quantity_kg),
+                            'date': m.date.isoformat(),
+                            'description': m.description or '',
+                        }
+                        for m in sorted(item.movements.all(), key=lambda m: m.date, reverse=True)
+                    ],
                 }
-            })
-        except WarehouseItem.DoesNotExist:
-            return JsonResponse({'error': 'Item not found'}, status=404)
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e),
-            }, status=400)
+                for item in items
+            ]
+        })
 
 
+class CreateWarehouseItemAPIView(FormOrApiView):
+    """Create a new warehouse item; any starting stock is booked as an 'in' movement"""
+
+    def post(self, request):
+        data = load_data(request)
+        name = parse_text(data.get('name'), 'Name', 255, required=True)
+        description = parse_text(data.get('description'), 'Description', 2000)
+        quantity = parse_int(data.get('quantity'), 'Quantity', minimum=0, maximum=MAX_STOCK_QTY, default=0)
+        quantity_kg = parse_decimal(data.get('quantity_kg'), 'Quantity (kg)', minimum=Decimal('0'),
+                                    maximum=MAX_STOCK_KG, default=Decimal('0'))
+
+        with db_transaction.atomic():
+            item = WarehouseItem.objects.create(name=name, description=description)
+            if quantity > 0 or quantity_kg > 0:
+                WarehouseMovement.objects.create(
+                    item=item, type=WarehouseMovement.IN, quantity=quantity, quantity_kg=quantity_kg,
+                    date=timezone.localdate(), description='Initial stock')
+                apply_stock_change(item, WarehouseMovement.IN, quantity, quantity_kg)
+
+        if wants_json(request):
+            return JsonResponse({'success': True, 'id': item.id, 'name': item.name, 'quantity': item.quantity})
+        return redirect('warehouse')
+
+
+class WarehouseMovementAPIView(FormOrApiView):
+    """Add a warehouse movement (in/out)"""
+
+    def post(self, request):
+        data = load_data(request)
+        movement_type = parse_choice(data.get('type'), MOVEMENT_TYPES, 'Type')
+        quantity = parse_int(data.get('quantity'), 'Quantity', minimum=0, maximum=MAX_STOCK_QTY, default=0)
+        quantity_kg = parse_decimal(data.get('quantity_kg'), 'Quantity (kg)', minimum=Decimal('0'),
+                                    maximum=MAX_STOCK_KG, default=Decimal('0'))
+        if quantity <= 0 and quantity_kg <= 0:
+            raise APIError('Enter a quantity or a weight greater than zero.')
+        date = parse_date(data.get('date') or timezone.localdate().isoformat(), 'Date')
+        description = parse_text(data.get('description'), 'Notes', 255)
+        item_id = parse_int(data.get('item_id'), 'Item', minimum=1)
+
+        with db_transaction.atomic():
+            item = get_or_404(WarehouseItem.objects.select_for_update(), item_id, 'Item')
+            apply_stock_change(item, movement_type, quantity, quantity_kg)
+            movement = WarehouseMovement.objects.create(
+                item=item, type=movement_type, quantity=quantity, quantity_kg=quantity_kg,
+                date=date, description=description)
+
+        if wants_json(request):
+            return JsonResponse({'success': True, 'id': movement.id, 'new_quantity': item.quantity})
+        return redirect('warehouse')
+
+
+class DeleteWarehouseMovementAPIView(FormOrApiView):
+    """Delete a warehouse movement and reverse its effect on the stock"""
+
+    def post(self, request, movement_id):
+        with db_transaction.atomic():
+            movement = get_or_404(WarehouseMovement.objects.select_related('item'), movement_id, 'Movement')
+            item = WarehouseItem.objects.select_for_update().get(pk=movement.item_id)
+            reverse = WarehouseMovement.OUT if movement.type == WarehouseMovement.IN else WarehouseMovement.IN
+            try:
+                apply_stock_change(item, reverse, movement.quantity, movement.quantity_kg)
+            except APIError:
+                raise APIError('This movement cannot be deleted because the stock it added has already been used.')
+            movement.delete()
+
+        if wants_json(request):
+            return JsonResponse({'success': True, 'new_quantity': item.quantity})
+        return redirect('warehouse')
+
+
+class DeleteWarehouseItemAPIView(FormOrApiView):
+    """Delete a warehouse item"""
+
+    def post(self, request, item_id):
+        get_or_404(WarehouseItem, item_id, 'Item').delete()
+        if wants_json(request):
+            return JsonResponse({'success': True, 'message': 'Item deleted successfully'})
+        return redirect('warehouse')
+
+
+class UpdateWarehouseItemAPIView(ApiView):
+    """Rename / re-describe a warehouse item (stock only changes through movements)"""
+
+    def post(self, request, item_id):
+        item = get_or_404(WarehouseItem, item_id, 'Item')
+        data = load_json(request)
+        if 'quantity' in data or 'quantity_kg' in data:
+            raise APIError('Stock can only be changed by adding a stock movement.')
+        if 'name' in data:
+            item.name = parse_text(data['name'], 'Name', 255, required=True)
+        if 'description' in data:
+            item.description = parse_text(data['description'], 'Description', 2000)
+        item.save()
+        return JsonResponse({
+            'success': True,
+            'item': {
+                'id': item.id,
+                'name': item.name,
+                'description': item.description,
+                'quantity': item.quantity,
+                'quantity_kg': str(item.quantity_kg),
+            },
+        })

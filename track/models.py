@@ -1,3 +1,6 @@
+from decimal import Decimal
+
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -34,7 +37,9 @@ class Transaction(models.Model):
     method = models.ForeignKey(
         PaymentMethod, on_delete=models.PROTECT, related_name="transactions"
     )
-    amount = models.PositiveIntegerField()
+    amount = models.DecimalField(
+        max_digits=14, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))]
+    )
     description = models.CharField(max_length=255, blank=True)
 
     date = models.DateField()
@@ -68,6 +73,7 @@ class MonthlyEntry(models.Model):
         Employee, on_delete=models.CASCADE, related_name="monthly_entries"
     )
     month = models.DateField()  # First day of the month
+    # Deprecated: balances are computed per currency from products and payments (see views.entry_balances).
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

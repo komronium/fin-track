@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Users - FinTrack</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body {
@@ -23,7 +24,7 @@
     }
 
     .btn {
-      transition: all 0.2s;
+      transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, opacity 0.2s;
       font-weight: 500;
       border-radius: 6px;
       padding: 8px 16px;
@@ -271,71 +272,35 @@
       }
     }
   </style>
+  <style>
+/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.table{display:table}.h-full{height:100%}
+  </style>
+  <style>
+    /* --- Accessibility & polish (shared) --- */
+    :focus-visible { outline: 2px solid #7367f0; outline-offset: 2px; }
+    .input-field:focus { outline: none; border-color: #7367f0; box-shadow: 0 0 0 3px rgba(115, 103, 240, 0.25); }
+    button, a, .btn, .tab-btn, .dots-btn { touch-action: manipulation; }
+    button.dropdown-item { width: 100%; border: 0; border-bottom: 1px solid #f8f7fa; background: none; color: inherit; font: inherit; font-size: 14px; text-align: left; }
+    button.dropdown-item:last-child { border-bottom: 0; }
+    button.link-btn { padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 500; text-align: left; cursor: pointer; }
+    button.link-btn:hover { color: #7367f0; text-decoration: underline; }
+    .skip-link { position: absolute; left: 8px; top: -48px; z-index: 1000; padding: 8px 14px; border-radius: 6px; background: #7367f0; color: #fff; text-decoration: none; }
+    .skip-link:focus { top: 8px; }
+    #toasts { position: fixed; right: 16px; bottom: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; max-width: min(420px, calc(100vw - 32px)); }
+    .toast { padding: 12px 16px; border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); font-size: 14px; font-weight: 500; background: #fff; color: #5e5873; border-left: 4px solid #7367f0; overflow-wrap: anywhere; }
+    .toast-error { border-left-color: #ea5455; background: #fdecec; color: #8a1c1c; }
+    .toast-success { border-left-color: #28c76f; background: #e8f8ee; color: #1b7a43; }
+    @media (prefers-reduced-motion: reduce) { *, ::before, ::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; } }
+  </style>
 </head>
 <body class="h-full" style="background: rgb(248, 247, 250); margin: 0px; color: rgb(94, 88, 115); font-family: 'Golos Text', sans-serif;">
+<a class="skip-link" href="#main">Skip to content</a>
   <div id="app" style="width: 100%; height: 100%; overflow: auto;">
     <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
 
-      <div style="width: 100%; padding: 16px 32px; border-bottom: 1px solid #ebe9f1; display: flex; justify-content: space-between; align-items: center; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
-        <div style="display: flex; align-items: center; gap: 32px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #7367f0, #5f54d6); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 1.2em;">F</div>
-            <h2 style="margin: 0; font-size: 1.3em; font-weight: 700; color: #5e5873;">FinTrack</h2>
-          </div>
-          <nav style="display: flex; gap: 8px;">
-            <a href="{% url 'dashboard' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="7" height="7"></rect>
-                <rect x="14" y="3" width="7" height="7"></rect>
-                <rect x="14" y="14" width="7" height="7"></rect>
-                <rect x="3" y="14" width="7" height="7"></rect>
-              </svg>
-              Dashboard
-            </a>
-            {% if request.user.is_staff %}
-            <a href="{% url 'users' %}" class="btn" style="background: #7367f0; color: white; text-decoration: none; display: flex; align-items: center; gap: 6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-              Users
-            </a>
-            <a href="{% url 'monthly' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-              Employees
-            </a>
-            <a href="{% url 'warehouse' %}" class="btn" style="background: transparent; color: #5e5873; text-decoration: none; display: flex; align-items: center; gap: 6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                <line x1="12" y1="22.08" x2="12" y2="12"></line>
-              </svg>
-              Warehouse
-            </a>
-            {% endif %}
-          </nav>
-        </div>
-        <form method="POST" action="{% url 'logout' %}" style="margin: 0;">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-            Logout
-          </button>
-        </form>
-      </div>
+      {% include "_nav.html" with active="users" %}
 
-      <div style="flex: 1; padding: 24px; overflow-y: auto;">
+      <div id="main" role="main" tabindex="-1" style="flex: 1; padding: 24px; overflow-y: auto; outline: none;">
         <div style="max-width: 1400px; margin: 0 auto;">
           <div style="margin-bottom: 24px;">
             <h1 style="font-size: 2em; margin: 0; color: #5e5873; font-weight: 700;">Users Management</h1>
@@ -385,22 +350,22 @@
                       <td style="text-align: right;">
                         {% if request.user.is_staff %}
                         <div class="dropdown">
-                          <button class="dots-btn" onclick="toggleDropdown(event, 'user-{{ user.id }}')">⋮</button>
+                          <button type="button" class="dots-btn" aria-label="Open actions menu" aria-haspopup="true" onclick="toggleDropdown(event, 'user-{{ user.id }}')">⋮</button>
                           <div id="user-{{ user.id }}" class="dropdown-menu">
-                            <div class="dropdown-item" onclick="editUser({{ user.id }})">
+                            <button type="button" class="dropdown-item" onclick="editUser({{ user.id }})">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                               </svg>
                               Edit
-                            </div>
-                            <div class="dropdown-item" onclick="deleteUser({{ user.id }})" style="color: #ea5455;">
+                            </button>
+                            <button type="button" class="dropdown-item" onclick="deleteUser({{ user.id }})" style="color: #ea5455;">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="3 6 5 6 21 6"></polyline>
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                               </svg>
                               Delete
-                            </div>
+                            </button>
                           </div>
                         </div>
                         {% endif %}
@@ -432,35 +397,35 @@
         <input type="hidden" id="userId" value="">
 
         <div>
-          <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;">Username</label>
+          <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;" for="username">Username</label>
           <input type="text" id="username" class="input-field" value="" required="">
         </div>
 
         <div>
-          <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;">Email</label>
+          <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;" for="email">Email</label>
           <input type="email" id="email" class="input-field" value="">
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
           <div>
-            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;">First Name</label>
+            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;" for="firstName">First Name</label>
             <input type="text" id="firstName" class="input-field" value="">
           </div>
 
           <div>
-            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;">Last Name</label>
+            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;" for="lastName">Last Name</label>
             <input type="text" id="lastName" class="input-field" value="">
           </div>
         </div>
 
         <div>
-          <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;">Password <span id="passwordHint" style="font-size: 0.85em; color: #999;"></span></label>
+          <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;" for="password">Password <span id="passwordHint" style="font-size: 0.85em; color: #999;"></span></label>
           <input type="password" id="password" class="input-field" value="">
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
           <div>
-            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;">Active</label>
+            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;" for="isActive">Active</label>
             <select id="isActive" class="input-field">
               <option value="true">Active</option>
               <option value="false">Inactive</option>
@@ -468,7 +433,7 @@
           </div>
 
           <div>
-            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;">Role</label>
+            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873;" for="isStaff">Role</label>
             <select id="isStaff" class="input-field">
               <option value="false">User</option>
               <option value="true">Staff</option>
@@ -492,7 +457,7 @@
 
     function openUserModal(userId = null) {
       if (!isStaff) {
-        alert('You do not have permission to manage users. Only staff members can add, edit, or delete users.');
+        notify('You do not have permission to manage users. Only staff members can add, edit, or delete users.');
         return;
       }
 
@@ -531,7 +496,7 @@
         })
         .catch(error => {
           console.error('Error loading user:', error);
-          alert('Error loading user data');
+          notify('Couldn\u2019t load the user. Check your connection and try again.', 'error');
         });
     }
 
@@ -571,12 +536,12 @@
           closeModal();
           loadUsers();
         } else {
-          alert('Error: ' + (data.error || 'Unknown error'));
+          notify('Error: ' + (data.error || 'Unknown error'));
         }
       })
       .catch(error => {
         console.error('Error saving user:', error);
-        alert('Error saving user');
+        notify('Couldn\u2019t save the user. Check your connection and try again.', 'error');
       });
     });
 
@@ -586,7 +551,7 @@
 
     function deleteUser(userId) {
       if (!isStaff) {
-        alert('You do not have permission to delete users. Only staff members can delete users.');
+        notify('You do not have permission to delete users. Only staff members can delete users.');
         return;
       }
 
@@ -607,13 +572,18 @@
         if (data.success) {
           loadUsers();
         } else {
-          alert('Error: ' + (data.error || 'Unknown error'));
+          notify('Error: ' + (data.error || 'Unknown error'));
         }
       })
       .catch(error => {
         console.error('Error deleting user:', error);
-        alert('Error deleting user');
+        notify('Couldn\u2019t delete the user. Check your connection and try again.', 'error');
       });
+    }
+
+    // Escape user-supplied text before it is placed inside an HTML template string.
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
     }
 
     function loadUsers() {
@@ -651,31 +621,31 @@
         if (isStaff) {
           actionsHTML = `
             <div class="dropdown">
-              <button class="dots-btn" onclick="toggleDropdown(event, 'user-${user.id}')">⋮</button>
+              <button type="button" class="dots-btn" aria-label="Open actions menu" aria-haspopup="true" onclick="toggleDropdown(event, 'user-${user.id}')">⋮</button>
               <div id="user-${user.id}" class="dropdown-menu">
-                <div class="dropdown-item" onclick="editUser(${user.id})">
+                <button type="button" class="dropdown-item" onclick="editUser(${user.id})">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                   </svg>
                   Edit
-                </div>
-                <div class="dropdown-item" onclick="deleteUser(${user.id})" style="color: #ea5455;">
+                </button>
+                <button type="button" class="dropdown-item" onclick="deleteUser(${user.id})" style="color: #ea5455;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                   </svg>
                   Delete
-                </div>
+                </button>
               </div>
             </div>
           `;
         }
 
         row.innerHTML = `
-          <td style="font-weight: 500;">${user.username}</td>
-          <td>${user.first_name} ${user.last_name}</td>
-          <td>${user.email}</td>
+          <td style="font-weight: 500;">${escapeHtml(user.username)}</td>
+          <td>${escapeHtml(user.first_name)} ${escapeHtml(user.last_name)}</td>
+          <td>${escapeHtml(user.email)}</td>
           <td>${statusBadge}</td>
           <td>${roleBadge}</td>
           <td style="text-align: right;">${actionsHTML}</td>
@@ -726,4 +696,18 @@
     // Load users on page load
     loadUsers();
   </script>
+
+<div id="toasts" role="status" aria-live="polite"></div>
+<script>
+  // Non-blocking, screen-reader friendly replacement for alert().
+  function notify(message, type) {
+    var kind = type || (/^(error|couldn|please|you do not|you cannot|not )/i.test(message) ? 'error' : (/success/i.test(message) ? 'success' : 'info'));
+    var box = document.getElementById('toasts');
+    var el = document.createElement('div');
+    el.className = 'toast toast-' + kind;
+    el.textContent = message;
+    box.appendChild(el);
+    setTimeout(function () { el.remove(); }, kind === 'error' ? 8000 : 4500);
+  }
+</script>
 </body></html>
