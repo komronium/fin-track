@@ -79,8 +79,21 @@ class UserManagementPermissionTests(AuthTestCase):
         resp = post_json(self.as_user(self.boss), f"/api/user/{self.boss.id}/update/", {"first_name": "Boss"})
         self.assertEqual(resp.status_code, 200)
 
-    def test_plain_user_can_still_read_user_list(self):
-        self.assertEqual(self.as_user(self.plain).get("/api/users/").status_code, 200)
+    def test_plain_user_cannot_read_the_user_list_page_or_api(self):
+        plain = self.as_user(self.plain)
+        self.assertEqual(plain.get("/users/").status_code, 403)
+        self.assertEqual(plain.get("/api/users/").status_code, 403)
+        self.assertEqual(plain.get(f"/api/user/{self.staff.id}/").status_code, 403)
+        self.assertContains(plain.get("/users/"), "only available to staff", status_code=403)
+
+    def test_staff_can_still_open_the_users_page_and_api(self):
+        staff = self.as_user(self.staff)
+        self.assertEqual(staff.get("/users/").status_code, 200)
+        self.assertEqual(staff.get("/api/users/").status_code, 200)
+        self.assertEqual(staff.get(f"/api/user/{self.plain.id}/").status_code, 200)
+
+    def test_anonymous_is_still_sent_to_sign_in_not_shown_a_403(self):
+        self.assertEqual(self.client.get("/users/").status_code, 302)
 
     def test_user_password_is_validated(self):
         resp = post_json(self.as_user(self.staff), "/api/user/create/", {"username": "weak", "password": "123"})
@@ -540,7 +553,7 @@ class NavbarConsistencyTests(AuthTestCase):
 
     def test_plain_user_sees_same_menu_everywhere(self):
         expected = [("/", "Dashboard"), ("/monthly/", "Employees"), ("/warehouse/", "Warehouse")]
-        for path in ("/", "/monthly/", "/warehouse/", "/users/"):
+        for path in ("/", "/monthly/", "/warehouse/"):
             with self.subTest(path=path):
                 self.assertEqual(self.nav_links(self.plain, path)[0], expected)
 

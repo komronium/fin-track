@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.exceptions import PermissionDenied, ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction as db_transaction
 from django.db.models import Sum
@@ -452,7 +452,13 @@ def password_error(password, user=None):
 
 
 class UsersView(LoginRequiredMixin, TemplateView):
+    """Account management: staff only (the menu already hides it from everyone else)."""
     template_name = 'users.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not request.user.is_staff:
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         kwargs['users'] = User.objects.all()
@@ -460,7 +466,9 @@ class UsersView(LoginRequiredMixin, TemplateView):
 
 
 class UsersListAPIView(ApiView):
-    """API endpoint to list users"""
+    """API endpoint to list users (staff only: it carries names and emails)"""
+
+    staff_methods = ('GET', 'POST')
 
     def get(self, request):
         return JsonResponse({'users': [user_payload(u) for u in User.objects.all()]})
@@ -492,7 +500,9 @@ class CreateUserAPIView(ApiView):
 
 
 class UserDetailAPIView(ApiView):
-    """API endpoint to get or update a user"""
+    """API endpoint to get or update a user (staff only)"""
+
+    staff_methods = ('GET', 'POST')
 
     def get(self, request, user_id):
         return JsonResponse(user_payload(get_or_404(User, user_id, 'User')))
