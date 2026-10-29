@@ -310,6 +310,20 @@ def dashboard_filters(params):
     return filters
 
 
+def period_label(filters):
+    """Words for the period the stat cards cover, e.g. '24-10-2026 \u2013 29-10-2026'."""
+    def fmt(iso):
+        return datetime.strptime(iso, '%Y-%m-%d').strftime('%d-%m-%Y')
+    start, end = filters.get('date_from'), filters.get('date_to')
+    if start and end:
+        return f'Totals for {fmt(start)} \u2013 {fmt(end)}'
+    if start:
+        return f'Totals from {fmt(start)}'
+    if end:
+        return f'Totals up to {fmt(end)}'
+    return 'Totals for all time'
+
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'dashboard.html'
 
@@ -317,6 +331,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         filters = dashboard_filters(self.request.GET)
         transactions = filter_transactions(filters)
         kwargs['filters'] = filters
+        kwargs['period_label'] = period_label(filters)
         kwargs['transactions'] = transactions.order_by('-date', '-id')[:TRANSACTION_PAGE_SIZE]
         kwargs['transactions_total'] = transactions.count()
         kwargs['payment_methods'] = PaymentMethod.objects.all()

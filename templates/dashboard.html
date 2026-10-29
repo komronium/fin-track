@@ -328,6 +328,7 @@
           <div style="margin-bottom: 24px;">
             <h1 style="font-size: 2em; margin: 0; color: #5e5873; font-weight: 700;">FinTrack Dashboard</h1>
             <p style="color: #82868b; margin-top: 4px;">Manage your transactions</p>
+            <p id="statsPeriod" aria-live="polite" style="color: #5e5873; margin: 12px 0 0; font-weight: 500;">{{ period_label }}</p>
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 32px;">
@@ -834,6 +835,15 @@
         });
     }
 
+    // Same wording as views.period_label, so the label never changes just because the page re-fetched.
+    function periodLabel(filters) {
+      const from = filters.date_from, to = filters.date_to;
+      if (from && to) return `Totals for ${formatDate(from)} \u2013 ${formatDate(to)}`;
+      if (from) return `Totals from ${formatDate(from)}`;
+      if (to) return `Totals up to ${formatDate(to)}`;
+      return 'Totals for all time';
+    }
+
     function applyFilters() {
       const filters = {
         type: typeFilter.value,
@@ -842,6 +852,7 @@
         date_to: dateToFilter.value,
       };
 
+      document.getElementById('statsPeriod').textContent = periodLabel(filters);
       loadTransactions(filters);
       loadStats(filters);
     }

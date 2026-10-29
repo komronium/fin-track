@@ -563,3 +563,13 @@ class DashboardFirstPaintTests(StaffTestCase):
         resp = self.client.get("/?date_from=abc&type=banana")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.context["incomes_uzs"], 100)
+
+    # The Income / Expense / Balance cards must say which period they add up.
+    def test_cards_name_their_period(self):
+        label = f"{self.five_ago.strftime('%d-%m-%Y')} – {self.today.strftime('%d-%m-%Y')}"
+        self.assertContains(self.client.get("/"), f'>Totals for {label}</p>')
+
+    def test_open_ended_and_all_time_labels(self):
+        self.assertContains(self.client.get("/?date_from=2000-01-01&date_to="), ">Totals from 01-01-2000</p>")
+        self.assertContains(self.client.get("/?date_to=2026-02-03"), ">Totals up to 03-02-2026</p>")
+        self.assertContains(self.client.get("/?date_from=&date_to="), ">Totals for all time</p>")
