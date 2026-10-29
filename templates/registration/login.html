@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#f8f7fa">
-  <title>Sign in · FinTrack</title>
+  <title>FinTrack Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -96,30 +96,30 @@
 <body>
   <main class="page">
     <div class="card">
-      <h1>Sign in</h1>
-      <p class="lead">Enter your credentials to continue.</p>
+      <h1>Sign In</h1>
+      <p class="lead">Enter your credentials to continue</p>
 
       <form method="post" action="{% url 'login' %}" id="loginForm">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next }}">
 
         {% if form.errors %}
-        <p class="error" role="alert">Incorrect username or password. Check both and try again.</p>
+        <p class="error" role="alert">❌ Invalid username or password</p>
         {% endif %}
 
         <div>
           <label for="id_username">Username</label>
           <input type="text" name="username" id="id_username" class="input-field"
-                 autocomplete="username" autocapitalize="none" spellcheck="false" required>
+                 autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Enter username" required>
         </div>
 
         <div>
           <label for="id_password">Password</label>
           <input type="password" name="password" id="id_password" class="input-field"
-                 autocomplete="current-password" required>
+                 autocomplete="current-password" placeholder="Enter password" required>
         </div>
 
-        <button type="submit" class="btn" id="submitBtn">Sign in</button>
+        <button type="submit" class="btn" id="submitBtn">Sign In</button>
       </form>
     </div>
   </main>
@@ -129,7 +129,7 @@
     document.getElementById('loginForm').addEventListener('submit', function () {
       var btn = document.getElementById('submitBtn');
       btn.disabled = true;
-      btn.textContent = 'Signing in…';
+      btn.textContent = 'Signing In…';
     });
   </script>
 </body>

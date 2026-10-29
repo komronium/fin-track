@@ -420,15 +420,17 @@ class WarehouseApiTests(StaffTestCase):
         self.assertContains(page, "Not enough stock")
 
 
-class DotThousandsFilterTests(TestCase):
-    def test_formats_whole_and_fractional_numbers(self):
-        from track.templatetags.number_format import dot_thousands
-        self.assertEqual(dot_thousands(1500000), "1.500.000")
-        self.assertEqual(dot_thousands(0), "0")
-        self.assertEqual(dot_thousands(12.5), "12,50")
-        self.assertEqual(dot_thousands(1234.56), "1.234,56")
-        self.assertEqual(dot_thousands(-2500), "-2.500")
-        self.assertEqual(dot_thousands("abc"), "abc")
+class CommaThousandsFilterTests(TestCase):
+    def test_matches_the_page_script_number_format(self):
+        from decimal import Decimal
+        from track.templatetags.number_format import comma_thousands
+        self.assertEqual(comma_thousands(1500000), "1,500,000")
+        self.assertEqual(comma_thousands(Decimal("1500000.00")), "1,500,000")
+        self.assertEqual(comma_thousands(Decimal("12.50")), "12.5")
+        self.assertEqual(comma_thousands(1234.567), "1,234.57")
+        self.assertEqual(comma_thousands(-2500), "-2,500")
+        self.assertEqual(comma_thousands(0), "0")
+        self.assertEqual(comma_thousands("abc"), "abc")
 
 
 class LoginPageTests(AuthTestCase):
@@ -443,7 +445,7 @@ class LoginPageTests(AuthTestCase):
 
     def test_wrong_password_shows_actionable_error(self):
         resp = self.client.post("/login/", {"username": "plain", "password": "nope"})
-        self.assertContains(resp, "Incorrect username or password")
+        self.assertContains(resp, "Invalid username or password")
 
     def test_login_redirects_to_next(self):
         resp = self.client.post("/login/", {"username": "plain", "password": "pw-plain-123", "next": "/users/"})
@@ -566,10 +568,50 @@ class DashboardFirstPaintTests(StaffTestCase):
 
     # The Income / Expense / Balance cards must say which period they add up.
     def test_cards_name_their_period(self):
-        label = f"{self.five_ago.strftime('%d-%m-%Y')} – {self.today.strftime('%d-%m-%Y')}"
+        label = f"{self.five_ago} \u2013 {self.today}"
         self.assertContains(self.client.get("/"), f'>Totals for {label}</p>')
 
     def test_open_ended_and_all_time_labels(self):
-        self.assertContains(self.client.get("/?date_from=2000-01-01&date_to="), ">Totals from 01-01-2000</p>")
-        self.assertContains(self.client.get("/?date_to=2026-02-03"), ">Totals up to 03-02-2026</p>")
+        self.assertContains(self.client.get("/?date_from=2000-01-01&date_to="), ">Totals from 2000-01-01</p>")
+        self.assertContains(self.client.get("/?date_to=2026-02-03"), ">Totals up to 2026-02-03</p>")
         self.assertContains(self.client.get("/?date_from=&date_to="), ">Totals for all time</p>")
+
+
+class DashboardLooksTheSameAsBeforeTests(StaffTestCase):
+    """The first paint must use the same number/date style the page script has always produced."""
+
+    def test_numbers_dates_and_units_use_the_familiar_format(self):
+        from django.utils import timezone
+        today = timezone.localdate()
+        Transaction.objects.create(type="income", currency="uzs", method=self.method, amount=1500000, date=today, description="a")
+        Transaction.objects.create(type="income", currency="usd", method=self.method, amount="12.50", date=today, description="b")
+        html = self.client.get("/").content.decode()
+        for expected in ("1,500,000 UZS", "12.5 USD", f"<td>{today.isoformat()}</td>", "0 AFN"):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, html)
+        for unwanted in ("1.500.000", "$ ", "؋ ", "d-m-Y"):
+            with self.subTest(unwanted=unwanted):
+                self.assertNotIn(unwanted, html.split("</nav>")[1].split("<script")[0])
+
+
+class SessionExpiryTests(AuthTestCase):
+    """Someone with an old tab open must get a friendly sign-in prompt, never a technical error."""
+
+    def test_stale_csrf_on_fetch_gets_json_and_session_header(self):
+        client = self.as_user(self.staff, enforce_csrf=True)
+        resp = post_json(client, "/api/transaction/create/", {})
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp["X-Session-Expired"], "1")
+        self.assertIn("sign in again", resp.json()["error"])
+
+    def test_stale_csrf_on_form_redirects_to_login_for_that_page(self):
+        client = self.as_user(self.staff, enforce_csrf=True)
+        resp = client.post("/api/warehouse/item/create/", {"name": "x"}, HTTP_REFERER="http://testserver/warehouse/")
+        self.assertRedirects(resp, "/login/?next=/warehouse/", fetch_redirect_response=False)
+
+    def test_anonymous_api_call_carries_session_header(self):
+        self.assertEqual(self.client.get("/api/stats/")["X-Session-Expired"], "1")
+
+    def test_pages_install_the_session_handler(self):
+        html = self.as_user(self.staff).get("/").content.decode()
+        self.assertIn("X-Session-Expired", html)

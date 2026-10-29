@@ -1,4 +1,4 @@
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django import template
 
@@ -7,14 +7,22 @@ register = template.Library()
 
 @register.filter
 def dot_thousands(value):
-    """1500000 -> 1.500.000 ; 1234.5 -> 1.234,50 (European grouping, decimals kept when present)."""
+    try:
+        return f"{int(value):,}".replace(",", ".")
+    except (ValueError, TypeError):
+        return value
+
+
+@register.filter
+def comma_thousands(value):
+    """Same output as the dashboard script's Intl.NumberFormat('en-US', {maximumFractionDigits: 2}):
+    1500000 -> 1,500,000 ; Decimal('12.50') -> 12.5"""
     try:
         number = Decimal(str(value))
     except (InvalidOperation, ValueError, TypeError):
         return value
     if not number.is_finite():
         return value
-    if number == number.to_integral_value():
-        return f"{int(number):,}".replace(",", ".")
-    whole, _, frac = f"{number:,.2f}".partition(".")
-    return f"{whole.replace(',', '.')},{frac}"
+    number = number.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    text = f"{number:,.2f}"
+    return text.rstrip("0").rstrip(".") if "." in text else text

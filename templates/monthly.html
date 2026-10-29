@@ -334,6 +334,22 @@
     .toast-success { border-left-color: #28c76f; background: #e8f8ee; color: #1b7a43; }
     @media (prefers-reduced-motion: reduce) { *, ::before, ::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; } }
   </style>
+  <script>
+    // If the session ended (or this page is stale), say so and go to sign-in instead of showing an error.
+    (function () {
+      var nativeFetch = window.fetch;
+      window.fetch = function () {
+        return nativeFetch.apply(this, arguments).then(function (res) {
+          if (res.headers.get('X-Session-Expired')) {
+            if (typeof notify === 'function') notify('Your session has expired. Taking you to the sign-in page\u2026', 'info');
+            setTimeout(function () { location.href = '/login/?next=' + encodeURIComponent(location.pathname); }, 1500);
+            return new Promise(function () {});
+          }
+          return res;
+        });
+      };
+    })();
+  </script>
 </head>
 <body class="h-full" style="background: rgb(248, 247, 250); margin: 0px; color: rgb(94, 88, 115); font-family: 'Golos Text', sans-serif;">
 <a class="skip-link" href="#main">Skip to content</a>

@@ -57,6 +57,23 @@ def error_response(message, status=400):
     return JsonResponse({'success': False, 'error': message}, status=status)
 
 
+def session_expired_response(message, status):
+    """Marked so the page script can send the person to the sign-in page instead of showing an error."""
+    response = error_response(message, status=status)
+    response['X-Session-Expired'] = '1'
+    return response
+
+
+def csrf_failure(request, reason=''):
+    """Friendly handling of a stale page / expired session (instead of Django's technical 403 page)."""
+    if request.META.get('HTTP_ACCEPT', '').startswith('application/json') or wants_json(request) \
+            or request.META.get('HTTP_X_CSRFTOKEN'):
+        return session_expired_response('Your session has expired. Please sign in again.', status=403)
+    from urllib.parse import quote, urlparse
+    path = urlparse(request.META.get('HTTP_REFERER', '')).path
+    return redirect(f"/login/?next={quote(path if path.startswith('/') else '/')}")
+
+
 def wants_json(request):
     return 'application/json' in request.META.get('CONTENT_TYPE', '')
 
@@ -214,7 +231,7 @@ class ApiView(View):
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return error_response('Authentication required.', status=401)
+            return session_expired_response('Authentication required.', status=401)
         try:
             if request.method in self.staff_methods and not request.user.is_staff:
                 raise APIError('Permission denied. Only staff users can perform this action.', status=403)
@@ -311,16 +328,14 @@ def dashboard_filters(params):
 
 
 def period_label(filters):
-    """Words for the period the stat cards cover, e.g. '24-10-2026 \u2013 29-10-2026'."""
-    def fmt(iso):
-        return datetime.strptime(iso, '%Y-%m-%d').strftime('%d-%m-%Y')
+    """Words for the period the stat cards cover, e.g. '2026-10-24 \u2013 2026-10-29'."""
     start, end = filters.get('date_from'), filters.get('date_to')
     if start and end:
-        return f'Totals for {fmt(start)} \u2013 {fmt(end)}'
+        return f'Totals for {start} \u2013 {end}'
     if start:
-        return f'Totals from {fmt(start)}'
+        return f'Totals from {start}'
     if end:
-        return f'Totals up to {fmt(end)}'
+        return f'Totals up to {end}'
     return 'Totals for all time'
 
 
@@ -332,7 +347,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         transactions = filter_transactions(filters)
         kwargs['filters'] = filters
         kwargs['period_label'] = period_label(filters)
-        kwargs['transactions'] = transactions.order_by('-date', '-id')[:TRANSACTION_PAGE_SIZE]
+        kwargs['transactions'] = transactions.order_by('-date', 'id')[:TRANSACTION_PAGE_SIZE]
         kwargs['transactions_total'] = transactions.count()
         kwargs['payment_methods'] = PaymentMethod.objects.all()
         kwargs.update(transaction_stats(transactions))
@@ -359,7 +374,7 @@ class TransactionListAPIView(ApiView):
                     'method_id': t.method_id,
                     'method_name': t.method.name,
                 }
-                for t in queryset.order_by('-date', '-id')[:limit]
+                for t in queryset.order_by('-date', 'id')[:limit]
             ]
         })
 

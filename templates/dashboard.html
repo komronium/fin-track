@@ -315,6 +315,22 @@
     .toast-success { border-left-color: #28c76f; background: #e8f8ee; color: #1b7a43; }
     @media (prefers-reduced-motion: reduce) { *, ::before, ::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; } }
   </style>
+  <script>
+    // If the session ended (or this page is stale), say so and go to sign-in instead of showing an error.
+    (function () {
+      var nativeFetch = window.fetch;
+      window.fetch = function () {
+        return nativeFetch.apply(this, arguments).then(function (res) {
+          if (res.headers.get('X-Session-Expired')) {
+            if (typeof notify === 'function') notify('Your session has expired. Taking you to the sign-in page\u2026', 'info');
+            setTimeout(function () { location.href = '/login/?next=' + encodeURIComponent(location.pathname); }, 1500);
+            return new Promise(function () {});
+          }
+          return res;
+        });
+      };
+    })();
+  </script>
 </head>
 <body class="h-full" style="background: rgb(248, 247, 250); margin: 0px; color: rgb(94, 88, 115); font-family: 'Golos Text', sans-serif;">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -339,15 +355,15 @@
               <div style="display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="font-size: 0.9em; color: #15803d; font-weight: 500;">UZS</span>
-                  <span id="incomeUzs" style="font-size: 1.5em; font-weight: 700; color: #16a34a;">{{ incomes_uzs | dot_thousands }} UZS</span>
+                  <span id="incomeUzs" style="font-size: 1.5em; font-weight: 700; color: #16a34a;">{{ incomes_uzs | comma_thousands }} UZS</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="font-size: 0.9em; color: #15803d; font-weight: 500;">USD</span>
-                  <span id="incomeUsd" style="font-size: 1.5em; font-weight: 700; color: #16a34a;">$ {{ incomes_usd | dot_thousands }}</span>
+                  <span id="incomeUsd" style="font-size: 1.5em; font-weight: 700; color: #16a34a;">{{ incomes_usd | comma_thousands }} USD</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="font-size: 0.9em; color: #15803d; font-weight: 500;">AFN</span>
-                  <span id="incomeAfn" style="font-size: 1.5em; font-weight: 700; color: #16a34a;">؋ {{ incomes_afn | dot_thousands }}</span>
+                  <span id="incomeAfn" style="font-size: 1.5em; font-weight: 700; color: #16a34a;">{{ incomes_afn | comma_thousands }} AFN</span>
                 </div>
               </div>
             </div>
@@ -359,15 +375,15 @@
               <div style="display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="font-size: 0.9em; color: #991b1b; font-weight: 500;">UZS</span>
-                  <span id="expenseUzs" style="font-size: 1.5em; font-weight: 700; color: #dc2626;">{{ expenses_uzs | dot_thousands }} UZS</span>
+                  <span id="expenseUzs" style="font-size: 1.5em; font-weight: 700; color: #dc2626;">{{ expenses_uzs | comma_thousands }} UZS</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="font-size: 0.9em; color: #991b1b; font-weight: 500;">USD</span>
-                  <span id="expenseUsd" style="font-size: 1.5em; font-weight: 700; color: #dc2626;"> {{ expenses_usd | dot_thousands }} USD</span>
+                  <span id="expenseUsd" style="font-size: 1.5em; font-weight: 700; color: #dc2626;">{{ expenses_usd | comma_thousands }} USD</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="font-size: 0.9em; color: #991b1b; font-weight: 500;">AFN</span>
-                  <span id="expenseAfn" style="font-size: 1.5em; font-weight: 700; color: #dc2626;">؋ {{ expenses_afn | dot_thousands }}</span>
+                  <span id="expenseAfn" style="font-size: 1.5em; font-weight: 700; color: #dc2626;">{{ expenses_afn | comma_thousands }} AFN</span>
                 </div>
               </div>
             </div>
@@ -379,15 +395,15 @@
               <div style="display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="font-size: 0.9em; color: #6d28d9; font-weight: 500;">UZS</span>
-                  <span id="balanceUzs" style="font-size: 1.5em; font-weight: 700; color: #7c3aed;">{{ balance_uzs | dot_thousands }} UZS</span>
+                  <span id="balanceUzs" style="font-size: 1.5em; font-weight: 700; color: #7c3aed;">{{ balance_uzs | comma_thousands }} UZS</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="font-size: 0.9em; color: #6d28d9; font-weight: 500;">USD</span>
-                  <span id="balanceUsd" style="font-size: 1.5em; font-weight: 700; color: #7c3aed;">$ {{ balance_usd | dot_thousands }}</span>
+                  <span id="balanceUsd" style="font-size: 1.5em; font-weight: 700; color: #7c3aed;">{{ balance_usd | comma_thousands }} USD</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="font-size: 0.9em; color: #6d28d9; font-weight: 500;">AFN</span>
-                  <span id="balanceAfn" style="font-size: 1.5em; font-weight: 700; color: #7c3aed;">؋ {{ balance_afn | dot_thousands }}</span>
+                  <span id="balanceAfn" style="font-size: 1.5em; font-weight: 700; color: #7c3aed;">{{ balance_afn | comma_thousands }} AFN</span>
                 </div>
               </div>
             </div>
@@ -450,7 +466,7 @@
                 <tbody id="transactionsBody">
                   {% for tran in transactions %}
                     <tr>
-                      <td>{{ tran.date | date:"d-m-Y" }}</td>
+                      <td>{{ tran.date | date:"Y-m-d" }}</td>
                       <td style="font-weight: 500;">{{ tran.description }}</td>
                       {% if tran.type == "income" %}
                       <td>
@@ -467,16 +483,16 @@
                       {% endif %}
                       <td>
                         <span class="badge badge-warning">
-                          {{ tran.method.name | title }}
+                          {{ tran.method.name }}
                         </span>
                       </td>
                       {% if tran.type == "income" %}
                       <td style="font-weight: 600; color: #28c76f;">
-                        {{ tran.amount | dot_thousands }}{% if tran.currency == 'uzs' %} UZS{% elif tran.currency == 'usd' %} USD{% else %} AFN{% endif %}
+                        {{ tran.amount | comma_thousands }}{% if tran.currency == 'uzs' %} UZS{% elif tran.currency == 'usd' %} USD{% else %} AFN{% endif %}
                       </td>
                       {% else %}
                       <td style="font-weight: 600; color: #ea5455;">
-                        {{ tran.amount | dot_thousands }}{% if tran.currency == 'uzs' %} UZS{% elif tran.currency == 'usd' %} USD{% else %} AFN{% endif %}
+                        {{ tran.amount | comma_thousands }}{% if tran.currency == 'uzs' %} UZS{% elif tran.currency == 'usd' %} USD{% else %} AFN{% endif %}
                       </td>
                       {% endif %}
                       <td style="text-align: right;">
@@ -739,12 +755,6 @@
         });
     }
 
-    // 2026-10-29 -> 29-10-2026 (same format as the server-rendered rows)
-    function formatDate(iso) {
-      const parts = String(iso).split('-');
-      return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : iso;
-    }
-
     function updateTransactionsTable(transactions, total) {
       const note = document.getElementById('transactionsNote');
       note.textContent = total > transactions.length
@@ -795,7 +805,7 @@
         const curr = transaction.currency || 'uzs';
         const sym = currencySymbol(curr);
         row.innerHTML = `
-          <td>${escapeHtml(formatDate(transaction.date))}</td>
+          <td>${escapeHtml(transaction.date)}</td>
           <td style="font-weight: 500;">${escapeHtml(transaction.description)}</td>
           <td><span class="badge ${badgeClass}">${typeDisplay}</span></td>
           <td><span class="badge badge-warning">${escapeHtml(transaction.method_name)}</span></td>
@@ -838,9 +848,9 @@
     // Same wording as views.period_label, so the label never changes just because the page re-fetched.
     function periodLabel(filters) {
       const from = filters.date_from, to = filters.date_to;
-      if (from && to) return `Totals for ${formatDate(from)} \u2013 ${formatDate(to)}`;
-      if (from) return `Totals from ${formatDate(from)}`;
-      if (to) return `Totals up to ${formatDate(to)}`;
+      if (from && to) return `Totals for ${from} \u2013 ${to}`;
+      if (from) return `Totals from ${from}`;
+      if (to) return `Totals up to ${to}`;
       return 'Totals for all time';
     }
 
@@ -866,7 +876,7 @@
     }
 
     function formatNumber(num) {
-      return new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(num);
+      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(num);
     }
 
     function toggleDropdown(event, id) {
