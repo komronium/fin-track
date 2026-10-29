@@ -15,6 +15,7 @@ from .views import (
     UserDetailAPIView,
     DeleteUserAPIView,
     EmployeeListAPIView,
+    EmployeeBalancesAPIView,
     CreateEmployeeAPIView,
     EmployeeDetailAPIView,
     DeleteEmployeeAPIView,
@@ -56,6 +57,7 @@ urlpatterns = [
     
     # Employee API endpoints
     path('api/employees/', EmployeeListAPIView.as_view(), name='api_employees'),
+    path('api/employees/balances/', EmployeeBalancesAPIView.as_view(), name='api_employee_balances'),
     path('api/employee/create/', CreateEmployeeAPIView.as_view(), name='api_create_employee'),
     path('api/employee/<int:employee_id>/', EmployeeDetailAPIView.as_view(), name='api_employee_detail'),
     path('api/employee/<int:employee_id>/delete/', DeleteEmployeeAPIView.as_view(), name='api_delete_employee'),

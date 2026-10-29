@@ -557,6 +557,21 @@ def entry_balances(entry_ids):
     return balances
 
 
+def employee_balances():
+    """{employee_id: {'uzs': Decimal, 'usd': Decimal, 'afn': Decimal}} over all months, in two grouped queries."""
+    balances = {eid: {curr: Decimal('0') for curr in CURRENCIES}
+                for eid in Employee.objects.values_list('id', flat=True)}
+    products = (MonthlyProduct.objects.order_by().values('monthly_entry__employee_id', 'currency')
+                .annotate(total=Sum('total_amount')))
+    payments = (MonthlyPayment.objects.order_by().values('monthly_entry__employee_id', 'currency')
+                .annotate(total=Sum('amount')))
+    for row in products:
+        balances[row['monthly_entry__employee_id']][row['currency']] += row['total']
+    for row in payments:
+        balances[row['monthly_entry__employee_id']][row['currency']] -= row['total']
+    return balances
+
+
 def clean_employee(data, current=None):
     def pick(key, fallback):
         return data[key] if key in data else fallback
@@ -594,6 +609,18 @@ class EmployeeListAPIView(ApiView):
                 }
                 for e in Employee.objects.all()
             ]
+        })
+
+
+class EmployeeBalancesAPIView(ApiView):
+    """Every employee's running balance per currency, for the employees list (one request, not one per month)."""
+
+    def get(self, request):
+        return JsonResponse({
+            'balances': {
+                str(employee_id): {curr: money_str(amount) for curr, amount in per_currency.items()}
+                for employee_id, per_currency in employee_balances().items()
+            }
         })
 
 

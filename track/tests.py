@@ -287,6 +287,33 @@ class MonthlyApiTests(StaffTestCase):
         self.assertEqual(detail["balance_uzs"], "3000.00")
         self.assertEqual(detail["balance_afn"], "0.00")
 
+    def test_balances_for_all_employees_come_from_one_request_and_match_the_entries(self):
+        other = Employee.objects.create(first_name="C", last_name="D")
+        entry2 = MonthlyEntry.objects.create(employee=self.emp, month="2026-09-01")
+        self.post("/api/monthly/product/add/", self.product())                                    # 25.25 usd
+        self.post("/api/monthly/product/add/", self.product(entry_id=entry2.id, currency="usd", quantity=1, price_per_unit=4.75))
+        self.post("/api/monthly/product/add/", self.product(currency="afn", quantity=2, price_per_unit=50))
+        self.post("/api/monthly/payment/add/", {"entry_id": entry2.id, "amount": "10.00", "currency": "usd", "payment_date": "2026-09-05"})
+        balances = self.client.get("/api/employees/balances/").json()["balances"]
+        self.assertEqual(balances[str(self.emp.id)], {"uzs": "0.00", "usd": "20.00", "afn": "100.00"})
+        self.assertEqual(balances[str(other.id)], {"uzs": "0.00", "usd": "0.00", "afn": "0.00"})
+
+    def test_balances_query_count_does_not_grow_with_employees(self):
+        def queries():
+            from django.db import connection
+            from django.test.utils import CaptureQueriesContext
+            with CaptureQueriesContext(connection) as ctx:
+                self.assertEqual(self.client.get("/api/employees/balances/").status_code, 200)
+            return len(ctx)
+        before = queries()
+        for i in range(10):
+            e = Employee.objects.create(first_name=f"E{i}", last_name="X")
+            MonthlyEntry.objects.create(employee=e, month="2026-10-01")
+        self.assertEqual(queries(), before)
+
+    def test_balances_require_sign_in(self):
+        self.assertEqual(Client().get("/api/employees/balances/").status_code, 401)
+
     def test_deleting_rows_updates_balance(self):
         pid = self.post("/api/monthly/product/add/", self.product()).json()["id"]
         payid = self.post("/api/monthly/payment/add/", {"entry_id": self.entry.id, "amount": 10, "currency": "usd", "payment_date": "2026-10-02"}).json()["id"]
