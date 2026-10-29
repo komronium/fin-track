@@ -402,30 +402,30 @@
               <div>
                 <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873; font-size: 0.9em;" for="typeFilter">Type</label>
                 <select id="typeFilter" class="input-field" onchange="applyFilters()">
-                  <option value="" selected="">All Types</option>
-                  <option value="income">Income</option>
-                  <option value="expense">Expense</option>
+                  <option value=""{% if not filters.type %} selected{% endif %}>All Types</option>
+                  <option value="income"{% if filters.type == 'income' %} selected{% endif %}>Income</option>
+                  <option value="expense"{% if filters.type == 'expense' %} selected{% endif %}>Expense</option>
                 </select>
               </div>
 
               <div>
                 <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873; font-size: 0.9em;" for="currencyFilter">Currency</label>
                 <select id="currencyFilter" class="input-field" onchange="applyFilters()">
-                  <option value="" selected="">All</option>
-                  <option value="uzs">UZS</option>
-                  <option value="usd">USD</option>
-                  <option value="afn">AFN</option>
+                  <option value=""{% if not filters.currency %} selected{% endif %}>All</option>
+                  <option value="uzs"{% if filters.currency == 'uzs' %} selected{% endif %}>UZS</option>
+                  <option value="usd"{% if filters.currency == 'usd' %} selected{% endif %}>USD</option>
+                  <option value="afn"{% if filters.currency == 'afn' %} selected{% endif %}>AFN</option>
                 </select>
               </div>
 
               <div>
                 <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873; font-size: 0.9em;" for="dateFromFilter">From Date</label>
-                <input type="date" id="dateFromFilter" class="input-field" onchange="applyFilters()">
+                <input type="date" id="dateFromFilter" class="input-field" onchange="applyFilters()" value="{{ filters.date_from }}">
               </div>
 
               <div>
                 <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #5e5873; font-size: 0.9em;" for="dateToFilter">To Date</label>
-                <input type="date" id="dateToFilter" class="input-field" onchange="applyFilters()">
+                <input type="date" id="dateToFilter" class="input-field" onchange="applyFilters()" value="{{ filters.date_to }}">
               </div>
 
               <div>
@@ -596,20 +596,6 @@
       return c === 'uzs' ? " UZS" : c === 'usd' ? ' USD' : ' AFN';
     }
     const isStaff = {{ request.user.is_staff|lower }};
-
-    // Set default dates: 5 days ago to today
-    function setDefaultDates() {
-      const today = new Date();
-      const fiveDaysAgo = new Date(today);
-      fiveDaysAgo.setDate(today.getDate() - 5);
-
-      const formatDate = (date) => date.toISOString().split('T')[0];
-      
-      dateFromFilter.value = formatDate(fiveDaysAgo);
-      dateToFilter.value = formatDate(today);
-    }
-
-    setDefaultDates();
 
     // Set today's date as default for form
     document.getElementById('date').valueAsDate = new Date();
@@ -912,8 +898,8 @@
     window.applyFilters = applyFilters;
     window.resetFilters = resetFilters;
 
-    // Load transactions and stats on page load with default date filters
-    applyFilters();
+    // The server already rendered the rows and totals for the filters shown above,
+    // so nothing is re-fetched on load (that used to make the numbers change after a moment).
   </script>
 
 <div id="toasts" role="status" aria-live="polite"></div>

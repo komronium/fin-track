@@ -480,7 +480,7 @@ class TransactionListLimitTests(StaffTestCase):
     def test_dashboard_caps_rendered_rows_and_says_so(self):
         from track import views
         with __import__("unittest").mock.patch.object(views, "TRANSACTION_PAGE_SIZE", 3):
-            page = self.client.get("/")
+            page = self.client.get("/?date_from=2000-01-01")
         self.assertContains(page, "Showing the latest 3 of 5 transactions")
         import re
         self.assertEqual(len(re.findall(r"toggleDropdown\(event, 'trans-\d+'\)", page.content.decode())), 3)
@@ -513,3 +513,53 @@ class NavbarConsistencyTests(AuthTestCase):
         for path in ("/", "/monthly/", "/warehouse/", "/users/"):
             with self.subTest(path=path):
                 self.assertEqual(self.nav_links(self.plain, path)[0], expected)
+
+
+class DashboardFirstPaintTests(StaffTestCase):
+    """What the server renders must already be what the page JS would show (no numbers changing after load)."""
+
+    def setUp(self):
+        super().setUp()
+        from datetime import timedelta
+        from django.utils import timezone
+        self.today = timezone.localdate()
+        self.five_ago = self.today - timedelta(days=5)
+
+        def add(days_ago, kind, amount, desc):
+            Transaction.objects.create(type=kind, currency="uzs", method=self.method, amount=amount,
+                                       date=self.today - timedelta(days=days_ago), description=desc)
+        add(0, "income", 100, "today")
+        add(3, "expense", 40, "three days ago")
+        add(30, "income", 1000, "last month")
+
+    def test_default_view_is_the_last_five_days(self):
+        resp = self.client.get("/")
+        self.assertEqual(resp.context["incomes_uzs"], 100)
+        self.assertEqual(resp.context["expenses_uzs"], 40)
+        self.assertEqual(sorted(t.description for t in resp.context["transactions"]), ["three days ago", "today"])
+
+    def test_first_paint_equals_api_for_the_same_filters(self):
+        resp = self.client.get("/")
+        api = self.client.get(f"/api/stats/?date_from={self.five_ago}&date_to={self.today}").json()
+        for key, value in api.items():
+            self.assertEqual(resp.context[key], value, key)
+
+    def test_filter_inputs_are_prefilled_by_the_server(self):
+        html = self.client.get("/").content.decode()
+        self.assertIn(f'id="dateFromFilter" class="input-field" onchange="applyFilters()" value="{self.five_ago}"', html)
+        self.assertIn(f'id="dateToFilter" class="input-field" onchange="applyFilters()" value="{self.today}"', html)
+
+    def test_page_does_not_reload_its_own_data_on_load(self):
+        html = self.client.get("/").content.decode()
+        self.assertNotIn("setDefaultDates", html)
+        self.assertNotIn("Load transactions and stats on page load", html)
+
+    def test_query_string_overrides_the_default(self):
+        resp = self.client.get("/?date_from=2000-01-01&type=income")
+        self.assertEqual(resp.context["incomes_uzs"], 1100)
+        self.assertContains(resp, '<option value="income" selected>Income</option>')
+
+    def test_invalid_query_string_falls_back_to_default(self):
+        resp = self.client.get("/?date_from=abc&type=banana")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context["incomes_uzs"], 100)

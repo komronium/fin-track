@@ -37,6 +37,7 @@ MAX_STOCK_QTY = 2_000_000_000
 
 TRANSACTION_PAGE_SIZE = 200      # rows rendered / returned by default
 MAX_TRANSACTION_LIMIT = 1000
+DEFAULT_DASHBOARD_DAYS = 5      # the dashboard opens on the last N days
 
 
 # --------------------------------------------------------------------------- #
@@ -291,11 +292,31 @@ def clean_transaction(data, current=None):
     }
 
 
+def dashboard_filters(params):
+    """Filters for the first paint: the URL's, or the last DEFAULT_DASHBOARD_DAYS days when none are given."""
+    today = timezone.localdate()
+    defaults = {
+        'type': '', 'currency': '',
+        'date_from': (today - timedelta(days=DEFAULT_DASHBOARD_DAYS)).isoformat(),
+        'date_to': today.isoformat(),
+    }
+    if not any(key in params for key in defaults):
+        return defaults
+    filters = {key: params.get(key, '') for key in defaults}
+    try:
+        filter_transactions(filters)
+    except APIError:
+        return defaults
+    return filters
+
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'dashboard.html'
 
     def get_context_data(self, **kwargs):
-        transactions = Transaction.objects.select_related('method')
+        filters = dashboard_filters(self.request.GET)
+        transactions = filter_transactions(filters)
+        kwargs['filters'] = filters
         kwargs['transactions'] = transactions.order_by('-date', '-id')[:TRANSACTION_PAGE_SIZE]
         kwargs['transactions_total'] = transactions.count()
         kwargs['payment_methods'] = PaymentMethod.objects.all()
