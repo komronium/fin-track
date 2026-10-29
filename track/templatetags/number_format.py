@@ -26,3 +26,15 @@ def comma_thousands(value):
     number = number.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     text = f"{number:,.2f}"
     return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+@register.filter
+def comma_fixed2(value):
+    """123868 -> 123,868.00 ; Decimal('0.5') -> 0.50 (grouped like the scripts' en-US formatting, always 2 decimals)."""
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return value
+    if not number.is_finite():
+        return value
+    return f"{number.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):,.2f}"

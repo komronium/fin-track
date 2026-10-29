@@ -1,4 +1,4 @@
-{% load number_format %}
+{% load number_format humanize %}
 
 <!DOCTYPE html>
 <html lang="en" style="font-size: 14px;">
@@ -76,6 +76,12 @@
     }
 
     .table tr:hover { background: #fafafa; }
+
+    /* Dari / Persian text keeps its own word order (brackets, mixed digits) inside the left-to-right table. */
+    .table td { unicode-bidi: plaintext; }
+    .table th.num, .table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    /* A zero is quiet, so the real amounts stand out. */
+    .is-zero { color: #a5a3ae !important; font-weight: 400 !important; }
 
     .badge {
       padding: 4px 12px;
@@ -347,8 +353,8 @@
                 <tr>
                   <th>Item</th>
                   <th>Description</th>
-                  <th>Quantity</th>
-                  <th>Quantity (kg)</th>
+                  <th class="num">Quantity</th>
+                  <th class="num">Quantity (kg)</th>
                   <th style="width: 50px;">Actions</th>
                 </tr>
               </thead>
@@ -358,8 +364,8 @@
                   <tr>
                     <td style="font-weight: 500;">{{ item.name }}</td>
                     <td>{{ item.description|default:"-" }}</td>
-                    <td>{{ item.quantity }}</td>
-                    <td>{{ item.quantity_kg|floatformat:2 }}</td>
+                    <td class="num{% if not item.quantity %} is-zero{% endif %}">{{ item.quantity|intcomma }}</td>
+                    <td class="num{% if not item.quantity_kg %} is-zero{% endif %}">{{ item.quantity_kg|comma_fixed2 }}</td>
                     <td style="text-align: center;">
                       {% if request.user.is_staff %}
                       <form method="POST" action="{% url 'api_warehouse_delete_item' item.id %}" style="display: inline;">
@@ -424,8 +430,8 @@
                 <tr>
                   <th>Item</th>
                   <th>Type</th>
-                  <th>Quantity</th>
-                  <th>Quantity (kg)</th>
+                  <th class="num">Quantity</th>
+                  <th class="num">Quantity (kg)</th>
                   <th>Date</th>
                   <th>Notes</th>
                   <th style="width: 50px;">Actions</th>
@@ -443,8 +449,8 @@
                         <span class="badge badge-out">OUT</span>
                       {% endif %}
                     </td>
-                    <td>{{ movement.quantity }}</td>
-                    <td>{{ movement.quantity_kg|floatformat:2 }}</td>
+                    <td class="num{% if not movement.quantity %} is-zero{% endif %}">{{ movement.quantity|intcomma }}</td>
+                    <td class="num{% if not movement.quantity_kg %} is-zero{% endif %}">{{ movement.quantity_kg|comma_fixed2 }}</td>
                     <td>{{ movement.date|date:"Y-m-d" }}</td>
                     <td>{{ movement.description|default:"-" }}</td>
                     <td style="text-align: center;">

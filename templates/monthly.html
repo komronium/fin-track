@@ -107,6 +107,12 @@
       background: #fafafa;
     }
 
+    /* Dari / Persian text keeps its own word order (brackets, mixed digits) inside the left-to-right table. */
+    .table td { unicode-bidi: plaintext; }
+    .table th.num, .table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    /* A zero is quiet, so the real amounts stand out. */
+    .is-zero { color: #a5a3ae !important; font-weight: 400 !important; }
+
     .badge {
       padding: 4px 12px;
       border-radius: 12px;
@@ -386,9 +392,9 @@
                     <tr>
                       <th>Name</th>
                       <th>Position</th>
-                      <th>UZS Balance</th>
-                      <th>USD Balance</th>
-                      <th>AFN Balance</th>
+                      <th class="num">UZS Balance</th>
+                      <th class="num">USD Balance</th>
+                      <th class="num">AFN Balance</th>
                       {% if request.user.is_staff %}<th style="width: 50px;">Actions</th>{% endif %}
                     </tr>
                   </thead>
@@ -450,10 +456,10 @@
                         <tr>
                           <th>Item Name</th>
                           <th>Unit Type</th>
-                          <th>Quantity</th>
-                          <th>Price per Unit</th>
+                          <th class="num">Quantity</th>
+                          <th class="num">Price per Unit</th>
                           <th>Currency</th>
-                          <th>Total Earned</th>
+                          <th class="num">Total Earned</th>
                           <th style="text-align: right;">Action</th>
                         </tr>
                       </thead>
@@ -474,7 +480,7 @@
                         <tr>
                           <th>Date</th>
                           <th>Description</th>
-                          <th>Amount</th>
+                          <th class="num">Amount</th>
                           <th>Currency</th>
                           <th style="text-align: right;">Action</th>
                         </tr>
@@ -742,6 +748,18 @@
       document.querySelectorAll('.action-menu').forEach(menu => menu.style.display = 'none');
     });
 
+    // 27025168.5 -> 27,025,168.50 (same grouping as the dashboard); display only, the server keeps the exact value.
+    function formatAmount(value) {
+      const number = Number(value);
+      return Number.isFinite(number) ? number.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value;
+    }
+
+    function showAmount(element, value) {
+      if (!element) return;
+      element.textContent = formatAmount(value);
+      element.classList.toggle('is-zero', Number(value) === 0);
+    }
+
     function formatCurrency(currency) {
       const currencyMap = {
         'uzs': '🇺🇿 UZS',
@@ -789,15 +807,9 @@
               <tr onclick="viewEmployee(${emp.id})" style="cursor: pointer;">
                 <td><button type="button" class="link-btn" onclick="event.stopPropagation(); viewEmployee(${emp.id})">${escapeHtml(emp.first_name)} ${escapeHtml(emp.last_name)}</button></td>
                 <td>${escapeHtml(emp.position || '-')}</td>
-                <td>
-                  <span style="font-weight: 600; color: #16a34a;" id="balance-uzs-${emp.id}">0</span>
-                </td>
-                <td>
-                  <span style="font-weight: 600; color: #2563eb;" id="balance-usd-${emp.id}">0</span>
-                </td>
-                <td>
-                  <span style="font-weight: 600; color: #d97706;" id="balance-afn-${emp.id}">0</span>
-                </td>
+                <td class="num"><span style="font-weight: 600; color: #16a34a;" id="balance-uzs-${emp.id}">0</span></td>
+                <td class="num"><span style="font-weight: 600; color: #2563eb;" id="balance-usd-${emp.id}">0</span></td>
+                <td class="num"><span style="font-weight: 600; color: #d97706;" id="balance-afn-${emp.id}">0</span></td>
                 ${actionsHtml}
               </tr>
             `;
@@ -816,7 +828,7 @@
           Object.entries(data.balances || {}).forEach(([employeeId, balance]) => {
             ['uzs', 'usd', 'afn'].forEach(currency => {
               const el = document.getElementById(`balance-${currency}-${employeeId}`);
-              if (el) el.textContent = balance[currency];
+              showAmount(el, balance[currency]);
             });
           });
         })
@@ -903,9 +915,9 @@
       });
 
       // UI (ekran) dagi elementlarni yangilaymiz
-      document.getElementById('balanceUzs').textContent = total_uzs.toFixed(2);
-      document.getElementById('balanceUsd').textContent = total_usd.toFixed(2);
-      document.getElementById('balanceAfn').textContent = total_afn.toFixed(2);
+      showAmount(document.getElementById('balanceUzs'), total_uzs);
+      showAmount(document.getElementById('balanceUsd'), total_usd);
+      showAmount(document.getElementById('balanceAfn'), total_afn);
       
       // Jadvallarga barcha oylarning yig'ilgan ma'lumotlarini beramiz
       updateItemsTable(allProducts);
@@ -929,10 +941,10 @@
         <tr>
           <td>${escapeHtml(item.product_name)}</td>
           <td>${item.unit_type === 'dona' ? 'Pieces' : 'Kilogram'}</td>
-          <td>${parseFloat(item.quantity).toFixed(2)}</td>
-          <td>${parseFloat(item.price_per_unit).toFixed(2)}</td>
+          <td class="num">${formatAmount(item.quantity)}</td>
+          <td class="num">${formatAmount(item.price_per_unit)}</td>
           <td><span style="display: inline-block;">${formatCurrency(item.currency)}</span></td>
-          <td>${parseFloat(item.total_amount).toFixed(2)}</td>
+          <td class="num">${formatAmount(item.total_amount)}</td>
           <td style="text-align: right;">
             ${userIsStaff ? `<button onclick="deleteItem(${item.id})" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;">Delete</button>` : '<span style="color: #82868b; font-size: 0.9em;">Read-only</span>'}
           </td>
@@ -951,7 +963,7 @@
         <tr>
           <td>${new Date(payment.payment_date).toLocaleDateString()}</td>
           <td>${escapeHtml(payment.description || '-')}</td>
-          <td>${parseFloat(payment.amount).toFixed(2)}</td>
+          <td class="num">${formatAmount(payment.amount)}</td>
           <td><span style="display: inline-block;">${formatCurrency(payment.currency)}</span></td>
           <td style="text-align: right;">
             ${userIsStaff ? `<button onclick="deletePayment(${payment.id})" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85em;">Delete</button>` : '<span style="color: #82868b; font-size: 0.9em;">Read-only</span>'}

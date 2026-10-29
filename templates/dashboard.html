@@ -116,6 +116,12 @@
       background: #fafafa;
     }
 
+    /* Dari / Persian text keeps its own word order (brackets, mixed digits) inside the left-to-right table. */
+    .table td { unicode-bidi: plaintext; }
+    .table th.num, .table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    /* A zero is quiet, so the real amounts stand out. */
+    .is-zero { color: #a5a3ae !important; font-weight: 400 !important; }
+
     .badge {
       padding: 4px 12px;
       border-radius: 12px;

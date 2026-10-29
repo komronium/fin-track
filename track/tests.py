@@ -1,3 +1,4 @@
+from decimal import Decimal
 import json
 
 from django.contrib.auth.models import User
@@ -718,3 +719,29 @@ class WarehouseMovementCapTests(StaffTestCase):
 
     def test_short_history_has_no_note(self):
         self.assertNotContains(self.client.get("/warehouse/"), "Showing the latest")
+
+
+
+class ReadabilityTests(StaffTestCase):
+    def test_comma_fixed2_groups_and_keeps_two_decimals(self):
+        from track.templatetags.number_format import comma_fixed2
+        self.assertEqual(comma_fixed2(123868), "123,868.00")
+        self.assertEqual(comma_fixed2("0.5"), "0.50")
+        self.assertEqual(comma_fixed2("-27025168.55"), "-27,025,168.55")
+        self.assertEqual(comma_fixed2("junk"), "junk")
+
+    def test_warehouse_numbers_are_grouped_right_aligned_and_zeros_are_quiet(self):
+        WarehouseItem.objects.create(name="Wheat", quantity=20678, quantity_kg=Decimal("123868"))
+        WarehouseItem.objects.create(name="Empty", quantity=0, quantity_kg=0)
+        html = self.client.get("/warehouse/").content.decode()
+        self.assertIn('<td class="num">20,678</td>', html)
+        self.assertIn('<td class="num">123,868.00</td>', html)
+        self.assertIn('<td class="num is-zero">0</td>', html)
+        self.assertIn('<td class="num is-zero">0.00</td>', html)
+        self.assertIn('<th class="num">Quantity</th>', html)
+
+    def test_monthly_page_formats_amounts_in_the_browser_helpers(self):
+        html = self.client.get("/monthly/").content.decode()
+        self.assertIn("function formatAmount", html)
+        self.assertIn("unicode-bidi: plaintext", html)
+        self.assertNotIn(".toFixed(2)", html)
